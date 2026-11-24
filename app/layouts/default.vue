@@ -97,10 +97,12 @@
         </template>
       </nav>
 
-      <!-- Clock -->
-      <div class="px-3 py-3 border-t border-gray-200 overflow-hidden">
-        <div v-if="!sidebarCollapsed" class="text-xs text-gray-400">{{ clock }}</div>
+      <!-- Clock + 深淺模式切換 -->
+      <div class="px-3 py-2.5 border-t border-gray-200 overflow-hidden flex items-center gap-2"
+        :class="sidebarCollapsed ? 'flex-col' : ''">
+        <div v-if="!sidebarCollapsed" class="text-xs text-gray-400 flex-1 min-w-0 truncate">{{ clock }}</div>
         <div v-else class="text-xs text-gray-400 text-center">🕐</div>
+        <ThemeToggle />
       </div>
     </aside>
 

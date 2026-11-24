@@ -3,4 +3,86 @@
 @plugin "flowbite/plugin";
 @source "../../node_modules/flowbite";
 
-@variant dark (&:where(.dark, .dark *));
+/* 深色模式以 <html class="dark"> 切換（由 app/composables/useTheme.ts 控制） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────────────────── 深色模式 ─────────────────────────
+   各頁面沒有逐一寫 dark: class，因此在深色模式下直接換掉
+   Tailwind 的色票變數（灰階反轉、彩色淺底改成暗色底）。
+   只作用在螢幕上，列印（收據、出貨標籤）一律維持淺色。 */
+@media screen {
+  html.dark {
+    color-scheme: dark;
+
+    /* 灰階：淺 ↔ 深 */
+    --color-gray-50:  #151a21;
+    --color-gray-100: #29313c;
+    --color-gray-200: #343d49;
+    --color-gray-300: #4a5462;
+    --color-gray-400: #7f8a99;
+    --color-gray-500: #99a3b1;
+    --color-gray-600: #b4bdc9;
+    --color-gray-700: #cdd3dc;
+    --color-gray-800: #e2e6eb;
+    --color-gray-900: #f1f3f5;
+
+    /* 彩色淺底（標籤、提示框、選取狀態）改成暗色底 */
+    --color-green-50:   #15271d;
+    --color-green-100:  #1b3a29;
+    --color-green-200:  #245238;
+    --color-emerald-100:#173a30;
+    --color-purple-50:  #241c35;
+    --color-purple-100: #312549;
+    --color-amber-50:   #2c2213;
+    --color-amber-100:  #3c2d15;
+    --color-amber-200:  #5a4218;
+    --color-amber-300:  #7a5a1c;
+    --color-blue-50:    #162238;
+    --color-blue-100:   #1d2f4d;
+    --color-red-50:     #33191b;
+    --color-red-100:    #4a1f22;
+
+    background-color: #151a21;
+  }
+
+  /* 卡片、輸入框的白底 */
+  html.dark body { background-color: #151a21; color: #e2e6eb; }
+}
+
+@layer utilities {
+  @media screen {
+    :where(.dark) .bg-white { background-color: #1f2630; }
+
+    /* 深色按鈕／選取的篩選鈕（配白字），維持深色 */
+    :where(.dark) .bg-gray-800 { background-color: #3b4452; }
+    :where(.dark) .border-gray-800 { border-color: #3b4452; }
+    :where(.dark) .hover\:bg-gray-900:hover { background-color: #4a5462; }
+
+    /* 彩色文字在暗底上提亮 */
+    :where(.dark) :is(.text-green-600, .text-green-700, .text-green-800) { color: #5fd38d; }
+    :where(.dark) :is(.text-purple-600, .text-purple-700) { color: #c4a7ff; }
+    :where(.dark) :is(.text-amber-600, .text-amber-700, .text-amber-800) { color: #fbbf5a; }
+    :where(.dark) :is(.text-blue-600, .text-blue-700) { color: #7fb2ff; }
+    :where(.dark) .text-red-600 { color: #f87171; }
+  }
+}
+
+@media screen {
+  /* 頁面裡有不少輸入框用 inline style 寫死白底黑字，需要 !important 蓋過 */
+  .dark input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+  .dark select,
+  .dark textarea {
+    background-color: #151a21 !important;
+    color: #e2e6eb !important;
+    border-color: #3a4350 !important;
+  }
+  .dark input:not([type="checkbox"], [type="radio"]):focus,
+  .dark select:focus,
+  .dark textarea:focus {
+    border-color: #22c55e !important;
+  }
+  .dark input::placeholder,
+  .dark textarea::placeholder { color: #6b7684; }
+  /* 收銀台折扣金額輸入框原本是琥珀色 */
+  .dark input[style*="#f59e0b"] { border-color: #b7791f !important; color: #fbbf5a !important; }
+}

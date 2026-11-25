@@ -1,0 +1,37 @@
+import type { EscOp } from './invoicePrint'
+
+// 收銀電腦上的 print-agent（smhf-pos/print-agent，C# .NET 4.0，XP / Win10 都能跑）
+// 網址可在瀏覽器 localStorage 設 pos-print-agent 覆寫；設成 off 就一律用瀏覽器列印。
+const DEFAULT_URL = 'http://127.0.0.1:17890'
+
+export function printAgentUrl() {
+  try { return localStorage.getItem('pos-print-agent') || DEFAULT_URL } catch { return DEFAULT_URL }
+}
+
+// 成功送到印表機回傳 true；print-agent 沒開、被瀏覽器擋（混合內容）或逾時就回傳 false。
+export async function printViaAgent(ops: EscOp[], timeoutMs = 4000): Promise<boolean> {
+  const url = printAgentUrl()
+  if (url === 'off') return false
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null
+  try {
+    // text/plain 是「簡單請求」，舊瀏覽器（Mypal）也不會先送 OPTIONS
+    const res = await fetch(`${url}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ ops }),
+      signal: ctrl?.signal,
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok || !body?.ok) {
+      console.warn('print-agent 列印失敗', body?.error ?? res.status)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('連不到 print-agent，改用瀏覽器列印', e)
+    return false
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}

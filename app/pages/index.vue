@@ -347,49 +347,10 @@
       </div>
     </div>
 
-    <!-- 列印專用收據（畫面上隱藏，只有列印時顯示）— 版面依實體電子發票範例排版 -->
-    <div v-if="lastOrder" id="receipt-print">
-
-      <!-- ① 電子發票證明聯 -->
-      <div class="rp-center rp-store">聖母健康農莊</div>
-      <div class="rp-center rp-doctitle">電子發票證明聯</div>
-      <div class="rp-center rp-period">{{ rocPeriod(lastOrder.createdAt) }}</div>
-      <div class="rp-center rp-invoice-no">{{ lastOrder.invoiceNo }}</div>
-      <div class="rp-center rp-datetime">{{ formatPrintDateTime(lastOrder.createdAt) }}</div>
-      <div class="rp-meta-row"><span>隨機碼:{{ lastOrder.invoiceRandomCode }}</span><span>總計:{{ lastOrder.total }}</span></div>
-      <div class="rp-meta-row"><span>賣方:{{ SELLER_ID }}</span></div>
-
-      <!-- 暫時占位，之後串接電子發票 API 後改成真正的條碼 / QR Code 圖檔 -->
-      <img v-if="barcodeUrl" :src="barcodeUrl" class="rp-barcode-img" alt="barcode" />
-      <div class="rp-qr-row">
-        <img v-if="qr1Url" :src="qr1Url" class="rp-qr-img" alt="QR1" />
-        <img v-if="qr2Url" :src="qr2Url" class="rp-qr-img" alt="QR2" />
-      </div>
-
-      <div class="rp-meta-row rp-small"><span>櫃:001</span><span>機:001</span><span>序:</span></div>
-      <div v-if="lastOrder.invoiceIsMock" class="rp-center rp-mock-tag">※ 測試用發票號碼，尚未上傳財政部平台</div>
-
-      <div class="rp-cut">✂ - - - - - - - - - - - - - - - - - - - - - -</div>
-
-      <!-- ② 交易明細聯 -->
-      <div class="rp-center rp-store">聖母健康農莊</div>
-      <div class="rp-detail-title">交易明細（{{ formatDetailDateTime(lastOrder.createdAt) }}）</div>
-      <div class="rp-hr"></div>
-      <div v-for="item in lastOrder.items" :key="item.productId" class="rp-item-block">
-        <div class="rp-row"><span>{{ item.name }}</span><span></span></div>
-        <div class="rp-row rp-item-sub"><span>x{{ item.qty }}</span><span>${{ item.finalPrice * item.qty }}</span></div>
-      </div>
-      <div class="rp-hr rp-dotted"></div>
-      <div class="rp-row"><span>小計</span><span>共{{ lastOrder.items.length }}項,${{ lastOrder.subtotal }}</span></div>
-      <div v-if="lastOrder.discountLabel" class="rp-row"><span>{{ lastOrder.discountLabel }}</span><span>- ${{ lastOrder.subtotal - lastOrder.total }}</span></div>
-      <div class="rp-hr rp-dotted"></div>
-      <div class="rp-row"><span>發票金額</span><span>${{ lastOrder.total }}</span></div>
-      <div class="rp-row"><span>付款方式</span><span>{{ lastOrder.payDetail || PAY_LABEL[lastOrder.payMethod] }}</span></div>
-      <div v-if="lastOrder.receivedCash > 0" class="rp-row"><span>收:{{ lastOrder.receivedCash }}</span><span>找零:{{ lastOrder.change }}</span></div>
-      <div class="rp-row"><span>備註:</span><span>{{ lastOrder.carrier || '' }}</span></div>
-      <div class="rp-center rp-footer">感謝您的惠顧　歡迎再次蒞臨</div>
+    <!-- 列印專用：照舊 BK35 POS 紙本版面（版面在 utils/invoicePrint.ts），畫面上隱藏 -->
+    <div v-if="printLayout" id="receipt-print">
+      <InvoicePrint ref="invoicePrintRef" :layout="printLayout" />
     </div>
-
 
   </div>
 </template>
@@ -397,9 +358,8 @@
 <script setup lang="ts">
   import { LOC_LABEL, PAY_LABEL } from '~/composables/usePosStore'
   import type { Product, DiscountType } from '~/composables/usePosStore'
-  // 需先在專案安裝：pnpm add qrcode jsbarcode
-  import QRCode from 'qrcode'
-  import JsBarcode from 'jsbarcode'
+  import { buildInvoiceLayout, buildEscPosJob } from '~/utils/invoicePrint'
+  import { printViaAgent } from '~/utils/printAgent'
 
   const { products, discountTypes, employees, vipMembers, addOrder } = usePosStore()
 
@@ -409,39 +369,6 @@
     { value: 'stall',      label: '擺攤' },
   ] as const
 
-// TODO: 確認這是聖母健康農莊開立發票用的正式統一編號（依你提供的收據範例填入）
-  const SELLER_ID = '36726891'
-
-  // 民國年 + 雙月期別，例如 2026-07 -> "115年07-08月"
-  function rocPeriod(d: Date) {
-    const date = new Date(d)
-    const roc = date.getFullYear() - 1911
-    const m = date.getMonth() + 1
-    const start = m % 2 === 1 ? m : m - 1
-    const end = start + 1
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${roc}年${pad(start)}-${pad(end)}月`
-  }
-  // 財政部一維條碼規格用的「發票年期別」5碼：3碼民國年 + 2碼期別雙數月，例如 115年07-08月 -> "11508"
-  function rocPeriodCode(d: Date) {
-    const date = new Date(d)
-    const roc = date.getFullYear() - 1911
-    const m = date.getMonth() + 1
-    const endMonth = m % 2 === 1 ? m + 1 : m
-    return `${String(roc).padStart(3, '0')}${String(endMonth).padStart(2, '0')}`
-  }
-  // 收據上發票證明聯用的日期格式，例如 "2026-07-31 10:57:35"
-  function formatPrintDateTime(d: Date) {
-    const date = new Date(d)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}  ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-  }
-  // 交易明細聯用的日期格式，例如 "2026/07/31 10:57:35"
-  function formatDetailDateTime(d: Date) {
-    const date = new Date(d)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-  }
 
   const payMethods = [
     { value: 'cash',    icon: '💵', label: '現金' },
@@ -492,61 +419,11 @@
   const carrier          = ref('')
   const carrierInput     = ref<HTMLInputElement | null>(null)
   const lastOrder        = ref<any>(null)
-  const qr1Url = ref('')
-  const qr2Url = ref('')
-  const barcodeUrl = ref('')
+  const invoicePrintRef  = ref<{ ready: () => Promise<void> } | null>(null)
+  // 發票版面（證明聯 + 交易明細）。條碼 / QR 的內容也在 utils/invoicePrint.ts 產生。
+  // TODO 串接正式電子發票後：用正式號碼、隨機碼與 AES 驗證碼取代模擬值；證明聯依規定只能印一次。
+  const printLayout = computed(() => lastOrder.value ? buildInvoiceLayout(lastOrder.value) : null)
 
-  // 依訂單內容產生 QR Code + 條碼圖片。
-  // 內容欄位順序參考財政部「電子發票證明聯一維及二維條碼規格說明」排列（發票字軌號碼/開立日期/
-  // 隨機碼/銷售額/總計額/買方統編/賣方統編...），但這裡沒有做規格要求的 AES 加密驗證資訊，
-  // 純粹方便測試排版跟掃描器讀取行為。
-  //
-  // TODO 之後串接綠界(ECPay)電子發票 API 後，這整個函式可以簡化很多：
-  // ECPay 的「上傳開立發票」API 回應會直接包含現成的 PosBarCode / QRCode_Left / QRCode_Right
-  // 三個字串，不用自己組內容、也不用處理 AES 加密，直接拿這三個字串去產生條碼/QR圖即可。
-  // 對照關係：
-  //   PosBarCode    -> 目前 barcodeText 的角色
-  //   QRCode_Left   -> 目前 qr1 的角色
-  //   QRCode_Right  -> 目前 qr2 的角色
-  //   IIS_Number         -> invoiceNo（發票字軌號碼）
-  //   IIS_Create_Date     -> createdAt（開立時間）
-  //   IIS_Random_Number  -> invoiceRandomCode（隨機碼）
-  //   IIS_Sales_Amount   -> total（總計金額）
-  //   IIS_Identifier     -> 買方統編（一般消費者固定 00000000）
-  //
-  // 另外注意：正式發票的「電子發票證明聯」依規定只能列印一次（遺失不可重印，補印聯不可兌獎），
-  // 上線前要在這裡加上「已列印」狀態判斷，避免同一張發票被重複列印。
-  async function generateQrCodes(order: any) {
-    const invDigits = String(order.invoiceNo).replace('-', '')
-    const dateCode = (() => {
-      const d = new Date(order.createdAt)
-      const roc = d.getFullYear() - 1911
-      const pad = (n: number) => String(n).padStart(2, '0')
-      return `${String(roc).padStart(3, '0')}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-    })()
-    const salesHex = order.total.toString(16).padStart(8, '0')
-    const buyerId = '00000000'
-
-    const qr1 = `${invDigits}${dateCode}${order.invoiceRandomCode}${salesHex}${salesHex}${buyerId}${SELLER_ID}`
-    const qr2 = `**${order.items.map((i: any) => `${i.name}:${i.qty}:${i.finalPrice}`).join(':')}`
-
-    // 一維條碼：發票年期別(5) + 發票字軌號碼(10) + 隨機碼(4)，Code 39
-    const barcodeText = `${rocPeriodCode(order.createdAt)}${invDigits}${order.invoiceRandomCode}`
-
-    try {
-      qr1Url.value = await QRCode.toDataURL(qr1, { margin: 1, width: 150 })
-      qr2Url.value = await QRCode.toDataURL(qr2, { margin: 1, width: 150 })
-
-      const canvas = document.createElement('canvas')
-      JsBarcode(canvas, barcodeText, {
-        format: 'CODE39', displayValue: true, fontSize: 12,
-        height: 40, margin: 4, // 40px ≈ 1.06cm，已超過法規要求的 ≥0.5cm
-      })
-      barcodeUrl.value = canvas.toDataURL()
-    } catch (e) {
-      console.error('QR Code / 條碼產生失敗', e)
-    }
-  }
   const selectedStaffId  = ref('')
   const vipInput         = ref('')   // 已選取的 VIP 號碼
   const vipSearch        = ref('')
@@ -704,7 +581,6 @@
     addOrder(order)
     const { orders } = usePosStore()
     lastOrder.value = orders.value[0]
-    await generateQrCodes(lastOrder.value)
     showReceipt.value = true
     cart.value = []
     curDiscount.value = enabledDiscounts.value[0] ?? null
@@ -713,8 +589,15 @@
   }
 
 
-  function printReceipt() {
-    nextTick(() => window.print())
+  // 先交給收銀電腦上的 print-agent 直接送 ESC/POS（和舊系統印出來一模一樣）；
+  // 連不到 print-agent 時改用瀏覽器列印（版面相同，字型略有差異）。
+  async function printReceipt() {
+    if (!printLayout.value) return
+    await nextTick()
+    if (await printViaAgent(buildEscPosJob(printLayout.value))) return
+    await invoicePrintRef.value?.ready()
+    await nextTick()
+    window.print()
   }
 
   // 測試列印：用假資料直接測印表機/排版，不會寫入真實訂單紀錄
@@ -737,13 +620,12 @@
       payMethod: 'cash',
       payDetail: '',
       carrier: '',
-      invoiceNo: 'AA-8888000',
+      invoiceNo: 'AA-88880000',
       invoiceRandomCode: genMockRandomCode(),
       invoiceIsMock: true,
     }
-    await generateQrCodes(lastOrder.value)
     showReceipt.value = true
-    nextTick(() => window.print())
+    await printReceipt()
   }
 
   function finishOrder()  { showReceipt.value = false }
@@ -770,38 +652,15 @@
     #receipt-print, #receipt-print * { visibility: visible; }
     #receipt-print {
       display: block;
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
-      /* 印表機是 EPSON TM-P20II，紙捲寬度規格 57.5±0.5mm，不是 80mm */
+      /* 57.5mm 紙捲，印字區 52mm 置中（同舊系統 ESC W 設定的 416 dots） */
       width: 57.5mm;
-      padding: 2mm;
-      font-family: 'Noto Sans TC', sans-serif;
-      font-size: 12px;
-      color: #000;
+      padding: 2mm 2.75mm 6mm;
+      box-sizing: border-box;
       background: #fff;
     }
     @page { size: 57.5mm auto; margin: 0; }
   }
-
-  .rp-center { text-align: center; }
-  .rp-store { font-size: 15px; font-weight: bold; }
-  .rp-doctitle { font-size: 0.5cm; font-weight: bold; margin-top: 2px; }
-  .rp-period { font-size: 0.5cm; font-weight: bold; margin-top: 2px; }
-  .rp-invoice-no { font-size: 0.5cm; font-weight: bold; letter-spacing: 2px; margin-top: 4px; }
-  .rp-datetime { font-size: 0.25cm; margin-top: 4px; }
-  .rp-meta-row { display: flex; justify-content: space-between; font-size: 0.25cm; margin: 3px 0; }
-  .rp-meta-row.rp-small { font-size: 10px; color: #333; }
-  .rp-barcode-img { display: block; margin: 8px auto 0; max-width: 100%; }
-  .rp-qr-row { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
-  .rp-qr-img { width: 1.8cm; height: 1.8cm; }
-  .rp-mock-tag { font-size: 9px; color: #b45309; margin-top: 6px; }
-  .rp-cut { text-align: center; font-size: 10px; color: #666; margin: 12px 0; letter-spacing: 1px; }
-  .rp-detail-title { font-size: 11px; margin: 4px 0; }
-  .rp-hr { border-top: 1px dashed #000; margin: 6px 0; }
-  .rp-hr.rp-dotted { border-top-style: dotted; }
-  .rp-row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
-  .rp-item-block { margin: 3px 0; }
-  .rp-item-sub { color: #555; padding-left: 8px; }
-  .rp-footer { font-size: 11px; margin-top: 10px; }
 </style>

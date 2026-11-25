@@ -205,15 +205,26 @@
       <div class="bg-white rounded-2xl p-7 w-80 shadow-2xl">
         <h3 class="text-base font-bold text-gray-900 mb-1">選擇員工</h3>
         <p class="text-sm text-gray-500 mb-4">請選擇此次消費的員工</p>
+        <template v-if="activeEmployees.length > 6">
+          <input v-model="staffSearch" type="text" placeholder="篩選編號、姓名或部門"
+                 class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm mb-2 focus:outline-none focus:border-green-500">
+          <select v-if="staffDepts.length > 1" v-model="staffDept"
+                  class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-green-500 bg-white text-gray-900">
+            <option value="">全部部門</option>
+            <option v-for="d in staffDepts" :key="d" :value="d">{{ d }}</option>
+          </select>
+        </template>
         <div class="space-y-2 mb-5 max-h-52 overflow-y-auto">
-          <button v-for="emp in activeEmployees" :key="emp.id"
+          <button v-for="emp in filteredStaff" :key="emp.id"
                   @click="selectedStaffId = emp.id"
                   class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left"
                   :class="selectedStaffId === emp.id ? 'bg-green-50 border-green-500' : 'border-gray-200 hover:bg-gray-50'">
             <span class="font-mono text-xs text-gray-400">{{ emp.id }}</span>
             <span class="font-medium text-gray-900">{{ emp.name }}</span>
+            <span v-if="emp.dept" class="text-xs text-gray-400 truncate">{{ emp.dept }}</span>
             <span v-if="selectedStaffId === emp.id" class="ml-auto text-green-600">✓</span>
           </button>
+          <div v-if="!filteredStaff.length" class="text-sm text-gray-400 text-center py-4">找不到符合的員工</div>
         </div>
         <div class="flex gap-2">
           <button @click="showStaffModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
@@ -441,6 +452,16 @@
   const vipSearch        = ref('')
 
   const activeEmployees = computed(() => employees.value.filter(e => e.enabled))
+  // 員工多（Excel 匯入幾百人）時可依姓名、編號、部門篩選
+  const staffSearch = ref('')
+  const staffDept   = ref('')
+  const staffDepts  = computed(() => [...new Set(activeEmployees.value.map(e => (e.dept || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant')))
+  const filteredStaff = computed(() => {
+    const q = staffSearch.value.trim().toLowerCase()
+    return activeEmployees.value.filter(e =>
+      (!staffDept.value || (e.dept || '').trim() === staffDept.value) &&
+      (!q || e.id.toLowerCase().includes(q) || e.name.toLowerCase().includes(q) || (e.dept || '').toLowerCase().includes(q)))
+  })
   const activeVips = computed(() => vipMembers.value.filter(v => v.enabled))
   const filteredVips = computed(() => {
     const q = vipSearch.value.trim().toLowerCase()
@@ -460,6 +481,8 @@
     if (!ensureCashier()) return // 要先選結帳人
     if (curDiscount.value?.requireStaff) {
       selectedStaffId.value = ''
+      staffSearch.value = ''
+      staffDept.value = ''
       showStaffModal.value = true
     } else if (curDiscount.value?.requireVip) {
       vipSearch.value = ''

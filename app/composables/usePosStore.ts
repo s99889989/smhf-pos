@@ -120,6 +120,7 @@ export interface DiscountType {
 export interface Employee {
   id: string    // F00228
   name: string  // 吳宣澔
+  dept?: string  // 部門（員工管理可分部門、Excel 匯入）
   enabled: boolean
   pinHash?: string  // 結帳人 PIN 的雜湊（useCashier.pinHash），沒設定 = 不能當結帳人
 }

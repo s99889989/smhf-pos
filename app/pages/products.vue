@@ -51,7 +51,7 @@
           >
             <td class="py-3 text-gray-400 text-xs">{{ prod.sortOrder }}</td>
             <td class="py-2">
-              <img v-if="prod.image" :src="thumbUrl(prod.image)" :alt="prod.name" loading="lazy" class="w-12 h-9 object-cover rounded-md bg-gray-100">
+              <CatalogImg v-if="prod.image" :file="prod.image" :alt="prod.name" class="w-12 h-9 object-cover rounded-md bg-gray-100" />
               <div v-else class="w-12 h-9 rounded-md bg-gray-50 border border-dashed border-gray-200"></div>
             </td>
             <td class="py-3">
@@ -122,7 +122,8 @@
           <div>
             <label class="text-xs text-gray-500 mb-2 block">圖片（存在資料機，收銀台卡片會顯示）</label>
             <div class="flex items-center gap-3">
-              <img v-if="imagePreview" :src="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100">
+              <img v-if="imageFile && imagePreview" :src="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100">
+              <CatalogImg v-else-if="imagePreview" :file="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100" />
               <div v-else class="w-20 h-15 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-xs text-gray-300">無圖片</div>
               <label class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
                 選擇圖片
@@ -192,7 +193,6 @@
 
 <script setup lang="ts">
 import type { Product } from '~/composables/usePosStore'
-import { catalogImageUrl } from '~/utils/catalogApi'
 
 const { products, materials, stations, stationName } = usePosStore()
 const cat = useCatalog()
@@ -212,7 +212,6 @@ function locColor(id: string) {
   const i = stations.value.findIndex(s => s.id === id)
   return COLORS[(i < 0 ? COLORS.length - 1 : i) % COLORS.length]
 }
-const thumbUrl = (file: string) => file.startsWith('blob:') ? file : catalogImageUrl(file)
 
 const defaultForm = () => ({
   name: '', price: 0, category: '', note: '',
@@ -255,7 +254,7 @@ function getMaterialName(id: number) {
 function resetImage(prod?: Product) {
   imageFile.value = null
   imageRemoved.value = false
-  imagePreview.value = prod?.image ? thumbUrl(prod.image) : ''
+  imagePreview.value = prod?.image ?? ''  // 檔名；<CatalogImg> 負責取圖
 }
 
 function openAdd() {

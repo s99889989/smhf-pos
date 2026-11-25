@@ -17,6 +17,7 @@
             <th class="text-left pb-3 font-medium">員工 ID</th>
             <th class="text-left pb-3 font-medium">姓名</th>
             <th class="text-left pb-3 font-medium pl-4">狀態</th>
+            <th class="text-left pb-3 font-medium pl-4">結帳 PIN</th>
             <th class="text-right pb-3 font-medium">操作</th>
           </tr>
         </thead>
@@ -31,6 +32,7 @@
                 {{ emp.enabled ? '在職' : '停用' }}
               </span>
             </td>
+            <td class="py-3 pl-4 text-xs" :class="emp.pinHash ? 'text-green-700' : 'text-gray-400'">{{ emp.pinHash ? '已設定' : '未設定' }}</td>
             <td class="py-3 text-right">
               <button @click="toggleEnabled(emp)" class="text-xs mr-3"
                 :class="emp.enabled ? 'text-amber-500 hover:underline' : 'text-green-500 hover:underline'">
@@ -56,6 +58,13 @@
             <label class="text-xs text-gray-500 mb-1 block">姓名 *</label>
             <input v-model="form.name" type="text" class="ifield" placeholder="例：吳宣澔">
           </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">結帳 PIN（4–6 位數字）{{ editId && hasPin ? '：已設定，留空 = 不變' : '' }}</label>
+            <input v-model="form.pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="ifield" placeholder="收銀台換人時輸入">
+            <label v-if="editId && hasPin" class="flex items-center gap-1.5 text-xs text-gray-500 mt-1.5">
+              <input v-model="form.clearPin" type="checkbox"> 清除 PIN（這位員工不能當結帳人）
+            </label>
+          </div>
         </div>
         <div class="flex gap-2 mt-6">
           <button @click="showModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
@@ -68,22 +77,30 @@
 
 <script setup lang="ts">
 import type { Employee } from '~/composables/usePosStore'
+import { pinHash, validPin } from '~/composables/useCashier'
 const { employees } = usePosStore()
 
 const showModal = ref(false)
 const editId    = ref<string | null>(null)
-const form      = ref({ id: '', name: '' })
+const form      = ref({ id: '', name: '', pin: '', clearPin: false })
+const hasPin    = computed(() => !!employees.value.find(e => e.id === editId.value)?.pinHash)
 
-function openAdd() { editId.value = null; form.value = { id: '', name: '' }; showModal.value = true }
-function openEdit(e: Employee) { editId.value = e.id; form.value = { id: e.id, name: e.name }; showModal.value = true }
+function openAdd() { editId.value = null; form.value = { id: '', name: '', pin: '', clearPin: false }; showModal.value = true }
+function openEdit(e: Employee) { editId.value = e.id; form.value = { id: e.id, name: e.name, pin: '', clearPin: false }; showModal.value = true }
 function save() {
   if (!form.value.id || !form.value.name) return
+  const pin = form.value.pin.trim()
+  if (pin && !validPin(pin)) { alert('PIN 要是 4–6 位數字'); return }
   if (editId.value) {
     const e = employees.value.find(e => e.id === editId.value)
-    if (e) e.name = form.value.name
+    if (e) {
+      e.name = form.value.name
+      if (pin) e.pinHash = pinHash(e.id, pin)
+      else if (form.value.clearPin) delete e.pinHash
+    }
   } else {
     if (employees.value.find(e => e.id === form.value.id)) { alert('ID 已存在'); return }
-    employees.value.push({ id: form.value.id, name: form.value.name, enabled: true })
+    employees.value.push({ id: form.value.id, name: form.value.name, enabled: true, ...(pin ? { pinHash: pinHash(form.value.id, pin) } : {}) })
   }
   showModal.value = false
 }

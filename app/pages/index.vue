@@ -4,25 +4,6 @@
     <!-- 品項區 -->
     <div class="flex flex-col flex-1 overflow-hidden">
 
-      <!-- 地點切換 -->
-      <div class="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3">
-        <!-- 本機已設收銀站（系統設定）：鎖定，只顯示該站 -->
-        <template v-if="station">
-          <span class="px-4 py-1.5 rounded-full text-sm font-medium border bg-green-700 text-white border-green-700">本機：{{ stationName(station) }}</span>
-          <NuxtLink to="/settings" class="text-xs text-gray-400 hover:text-gray-600">更改</NuxtLink>
-        </template>
-        <template v-else>
-        <button
-                v-for="loc in locations" :key="loc.value"
-                @click="curLoc = loc.value"
-                class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors border"
-                :class="curLoc === loc.value
-            ? 'bg-green-700 text-white border-green-700'
-            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'"
-        >{{ loc.label }}</button>
-        </template>
-      </div>
-
       <!-- 分類 -->
       <div class="bg-white border-b border-gray-200 px-5 py-2.5 flex gap-2 overflow-x-auto">
         <button
@@ -33,6 +14,10 @@
             ? 'bg-gray-100 text-gray-900 border-gray-400 font-medium'
             : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
         >{{ c }}</button>
+        <!-- 收銀站在「系統設定」選；沒設定時才在這裡小提示（已設定就不顯示） -->
+        <NuxtLink v-if="!station" to="/settings" class="ml-auto shrink-0 whitespace-nowrap self-center text-xs text-amber-600 hover:underline">
+          未設定收銀站（顯示全部品項）→ 設定
+        </NuxtLink>
       </div>
 
       <!-- 品項卡片 -->
@@ -50,8 +35,8 @@
           </span>
           <!-- 商品圖（資料機縮圖）：載不到就只顯示文字 -->
           <div v-if="prod.image && !imgErrors.has(prod.image)" class="-mx-3.5 -mt-3.5 mb-2 aspect-[4/3] overflow-hidden rounded-t-xl bg-gray-100">
-            <img :src="thumbUrl(prod.image)" :alt="prod.name" loading="lazy" decoding="async"
-                 class="w-full h-full object-cover" @error="imgErrors.add(prod.image)">
+            <CatalogImg :file="prod.image" :alt="prod.name"
+                        class="w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
           </div>
           <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
           <div class="flex items-baseline gap-1.5">
@@ -78,6 +63,9 @@
           <button @click="clearCart" class="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">✕ 清空</button>
         </div>
       </div>
+
+      <!-- 結帳人（換人） -->
+      <CashierBar />
 
       <!-- 折扣選擇（動態從設定讀取） -->
       <div class="px-3 pt-3 pb-2 border-b border-gray-100">
@@ -307,6 +295,7 @@
             </div>
             <div class="flex justify-between"><span>日期</span><span class="text-gray-800">{{ formatDate(lastOrder.createdAt) }}</span></div>
             <div class="flex justify-between"><span>地點</span><span class="text-gray-800">{{ stationName(lastOrder.location) }}</span></div>
+            <div v-if="lastOrder.cashierName" class="flex justify-between"><span>結帳人</span><span class="text-gray-800">{{ lastOrder.cashierName }}</span></div>
             <div v-if="lastOrder.discountLabel" class="flex justify-between">
               <span>折扣</span><span class="text-purple-600 font-medium">{{ lastOrder.discountLabel }}</span>
             </div>
@@ -380,21 +369,17 @@
 <script setup lang="ts">
   import { LOC_LABEL, PAY_LABEL } from '~/composables/usePosStore'
   import { loadStation } from '~/composables/useStation'
-  import { catalogImageUrl } from '~/utils/catalogApi'
   import type { Product, DiscountType } from '~/composables/usePosStore'
   import { buildInvoiceLayout, buildEscPosJob } from '~/utils/invoicePrint'
   import { printViaAgent, printBillViaAgent } from '~/utils/printAgent'
   import { issueEInvoice, formatInvoiceNo } from '~/utils/einvoiceApi'
   import { buildBillLines, type BillLine, type BillOrder } from '~/utils/billPrint'
 
-  const { products, discountTypes, employees, vipMembers, addOrder, stations, stationName } = usePosStore()
+  const { products, discountTypes, employees, vipMembers, addOrder, stationName } = usePosStore()
 
-  // 站別由資料機設定（系統設定可新增、改名）
-  const locations = computed(() => stations.value.map(s => ({ value: s.id, label: s.name })))
 
-  // 商品圖片：資料機上的縮圖（blob: 是範例模式剛選的圖）
+  // 商品圖片（資料機上的縮圖，<CatalogImg> 會依區網 / Hub 取圖）；載不到的就只顯示文字
   const imgErrors = reactive(new Set<string>())
-  const thumbUrl = (file: string) => file.startsWith('blob:') ? file : catalogImageUrl(file)
 
 
   const payMethods = [
@@ -406,7 +391,7 @@
 
   const enabledDiscounts = computed(() => discountTypes.value.filter(d => d.enabled))
 
-  const curLoc      = ref<string>('restaurant')
+  const curLoc      = ref<string>('')   // = 本機收銀站；沒設定時是空的（顯示全部品項）
   const curCat      = ref('全部')
   const curPay      = ref<'cash' | 'card' | 'hua' | 'voucher'>('cash')
   const voucherAmount = ref(0)
@@ -468,8 +453,11 @@
   })
 
   // 結帳流程：先判斷折扣類型是否需要員工/VIP驗證
+  const { cashier, ensure: ensureCashier } = useCashier()
+
   function startCheckout() {
     if (!cart.value.length) return
+    if (!ensureCashier()) return // 要先選結帳人
     if (curDiscount.value?.requireStaff) {
       selectedStaffId.value = ''
       showStaffModal.value = true
@@ -496,11 +484,7 @@
 
   // 本機收銀站：設了就鎖定（地點切換鈕隱藏），只顯示該站商品
   const station = useStation()
-  watch(station, (v) => { if (v) curLoc.value = v }, { immediate: true })
-  // 站別清單換了（資料機載入、改名刪除）：目前的站不在清單裡就選第一站
-  watch(stations, (list) => {
-    if (!station.value && list.length && !list.some(s => s.id === curLoc.value)) curLoc.value = list[0]!.id
-  })
+  watch(station, (v) => { curLoc.value = v }, { immediate: true })
   onMounted(loadStation)
 
   // 預設選第一個折扣
@@ -552,7 +536,7 @@
   }
 
   const locProducts = computed(() =>
-          products.value.filter(p => p.locations.includes(curLoc.value)).sort((a, b) => a.sortOrder - b.sortOrder)
+          products.value.filter(p => !curLoc.value || p.locations.includes(curLoc.value)).sort((a, b) => a.sortOrder - b.sortOrder)
   )
   const categories = computed(() => ['全部', ...new Set(locProducts.value.map(p => p.category || '其他'))])
   const filteredProducts = computed(() =>
@@ -614,6 +598,8 @@
       invoiceRandomCode: '',
       invoiceAes: '',
       invoiceIsMock: false,
+      cashierId: cashier.value?.id ?? '',
+      cashierName: cashier.value?.name ?? '',
     }
 
     // 向後端開立電子發票（配號 + 隨機碼 + QR 驗證碼）；上傳由後端處理
@@ -637,10 +623,9 @@
     }
     showCarrierModal.value = false
 
-    addOrder(order)
-    const { orders } = usePosStore()
     // 發票日期以伺服器開立時間為準（收銀電腦時鐘可能不準）
-    if (issuedAt) orders.value[0]!.createdAt = issuedAt
+    addOrder(order, issuedAt ?? undefined)
+    const { orders } = usePosStore()
     lastOrder.value = orders.value[0]
     showReceipt.value = true
     cart.value = []

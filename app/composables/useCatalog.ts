@@ -3,7 +3,7 @@
 // 這裡負責：開網頁時載入、各頁面修改時寫回資料機、結帳後扣資料機庫存。
 // 連不到 print-agent（例如開發電腦）時是「範例模式」：用 usePosStore 內建的範例資料，改了只在這個分頁有效。
 import type { Product, Material, StockIn, InternalUse, StationDef } from './usePosStore'
-import { catalogAll, catalogPost, catalogUploadImage, CatalogError, type CatalogAll } from '~/utils/catalogApi'
+import { catalogAll, catalogPost, catalogUploadImage, catalogRoute, CatalogError, type CatalogAll } from '~/utils/catalogApi'
 import { prepareImage } from '~/utils/imageUpload'
 
 export interface CatalogState {
@@ -12,6 +12,7 @@ export interface CatalogState {
   pending: number           // 平板：還沒補送到資料機的庫存異動筆數
   syncedAt: string
   error: string             // 最近一次載入 / 儲存失敗原因
+  route: 'lan' | 'hub'      // 區網直連，或區網不通改走家裡 Hub
 }
 
 const PENDING_KEY = 'pos-stock-pending' // 收銀機：結帳扣庫存送不出去時先存這裡，下次載入再補送
@@ -28,7 +29,7 @@ function newClientId() {
 
 export function useCatalog() {
   const store = usePosStore()
-  const state = useState<CatalogState>('catalogState', () => ({ mode: 'loading', offline: false, pending: 0, syncedAt: '', error: '' }))
+  const state = useState<CatalogState>('catalogState', () => ({ mode: 'loading', offline: false, pending: 0, syncedAt: '', error: '', route: 'lan' }))
 
   const connected = () => state.value.mode === 'online' || state.value.mode === 'tablet'
 
@@ -58,6 +59,7 @@ export function useCatalog() {
       pending: d.pending ?? 0,
       syncedAt: d.syncedAt || '',
       error: d.offline ? `離線中，用平板上的資料（${d.syncedAt || '尚未同步'}）` : '',
+      route: catalogRoute(),
     }
   }
 

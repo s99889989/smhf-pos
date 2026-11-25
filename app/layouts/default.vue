@@ -158,7 +158,6 @@ const navSections = [
         subLabel: '帳號',
         icon: '👥',
         children: [
-          { to: '/accounts', icon: '🔑', label: '帳號管理' },
           { to: '/staff',    icon: '👤', label: '員工管理' },
           { to: '/vip',      icon: '⭐', label: 'VIP 管理' },
         ],

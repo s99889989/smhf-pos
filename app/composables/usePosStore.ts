@@ -1,4 +1,5 @@
 // composables/usePosStore.ts
+import { saveOrder, newClientId } from '~/utils/ordersApi'
 
 export interface Material {
   id: number
@@ -80,6 +81,30 @@ export interface Order {
   payDetail: string       // 混合付款說明，例：消費券$200 + 現金$50
   carrier: string
   createdAt: Date
+  clientId?: string       // 存到資料機用的唯一代號（重送不會存兩次）
+  invoiceNo?: string      // BM-92177850
+  invoiceRandomCode?: string
+  invoiceAes?: string
+  invoiceIsMock?: boolean
+  cashierId?: string      // 結帳人（員工 ID）
+  cashierName?: string
+}
+
+// 單號：這台機器代號-月日-當日流水號，例 KQ-1125-003（機器代號第一次用時隨機產生，存在 localStorage）
+function nextOrderNo(at: Date) {
+  const ls = (k: string, v?: string) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v) } catch { /* 無痕模式 */ } return null }
+  let code = ls('pos-device-code')
+  if (!code) {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+    code = A[Math.floor(Math.random() * A.length)]! + A[Math.floor(Math.random() * A.length)]!
+    ls('pos-device-code', code)
+  }
+  const md = String(at.getMonth() + 1).padStart(2, '0') + String(at.getDate()).padStart(2, '0')
+  let seq: { day: string; n: number } = { day: '', n: 0 }
+  try { seq = JSON.parse(ls('pos-order-seq') || '') } catch { /* 第一次 */ }
+  const n = seq.day === md ? seq.n + 1 : 1
+  ls('pos-order-seq', JSON.stringify({ day: md, n }))
+  return `${code}-${md}-${String(n).padStart(3, '0')}`
 }
 
 export interface DiscountType {
@@ -96,6 +121,7 @@ export interface Employee {
   id: string    // F00228
   name: string  // 吳宣澔
   enabled: boolean
+  pinHash?: string  // 結帳人 PIN 的雜湊（useCashier.pinHash），沒設定 = 不能當結帳人
 }
 
 export interface VipMember {
@@ -108,17 +134,6 @@ export interface VipMember {
 }
 
 // 線上商店訂單
-export interface GoogleAccount {
-  id: string          // Google sub ID
-  name: string
-  email: string
-  avatar: string
-  memberType: 'none' | 'staff' | 'vip'
-  memberId: string    // 對應的員工ID或VIP號碼
-  firstLoginAt: Date
-  lastLoginAt: Date
-}
-
 export interface ShopOrderItem {
   productId: number
   name: string
@@ -263,10 +278,15 @@ export function usePosStore() {
   const orders = useState<Order[]>('orders', () => [])
   const orderSeq = useState<number>('orderSeq', () => 1)
 
-  function addOrder(order: Omit<Order, 'id' | 'no' | 'createdAt'>) {
-    const no = 'A' + String(orderSeq.value).padStart(4, '0')
-    orders.value.unshift({ ...order, id: orderSeq.value, no, createdAt: new Date() })
+  // createdAt：有開發票時用資料機的開立時間（收銀電腦時鐘可能不準）
+  function addOrder(order: Omit<Order, 'id' | 'no' | 'createdAt' | 'clientId'>, createdAt = new Date()) {
+    const no = nextOrderNo(createdAt)
+    const clientId = newClientId()
+    orders.value.unshift({ ...order, id: orderSeq.value, no, clientId, createdAt })
     orderSeq.value++
+    // 交易紀錄存一份到資料機（送不出去會先存在這台、稍後補送）；QR 驗證碼不用存
+    const { invoiceAes: _qr, ...record } = order
+    void saveOrder(clientId, { ...record, no, createdAt: createdAt.toISOString() })
     const cat = useCatalog()
     if (cat.connected()) {
       // 扣資料機的共用庫存（送不出去會先存在這台、稍後補送）
@@ -299,20 +319,6 @@ export function usePosStore() {
     shopOrderSeq.value++
   }
 
-  // Google 帳號（登入後自動建立，後台再綁定身分）
-  const googleAccounts = useState<GoogleAccount[]>('googleAccounts', () => [
-    {
-      id: 'google-001', name: '楊鄉咪', email: 'example@gmail.com', avatar: '',
-      memberType: 'vip', memberId: '155375',
-      firstLoginAt: new Date('2024-01-01'), lastLoginAt: new Date(),
-    },
-    {
-      id: 'google-002', name: '測試用戶', email: 'test@gmail.com', avatar: '',
-      memberType: 'none', memberId: '',
-      firstLoginAt: new Date('2024-03-15'), lastLoginAt: new Date('2024-03-15'),
-    },
-  ])
-
   return {
     discountTypes, employees, vipMembers,
     materials, stockIns, addStockIn,
@@ -320,6 +326,5 @@ export function usePosStore() {
     products, orders, addOrder,
     stations, stationName,
     shopOrders, addShopOrder,
-    googleAccounts,
   }
 }

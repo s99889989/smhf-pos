@@ -6,10 +6,12 @@
       <p class="text-xs text-gray-400 mt-0.5">折扣類型與其他設定</p>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6 max-w-2xl">
+    <!-- 依視窗寬度排成 1～3 欄（CSS columns，卡片高度不同也不會留大洞；XP 的 Mypal 也支援） -->
+    <div class="flex-1 overflow-y-auto px-6 py-5">
+     <div class="columns-1 lg:columns-2 2xl:columns-3 gap-6">
 
       <!-- 本機收銀站 -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100">
           <h2 class="text-sm font-semibold text-gray-800">本機收銀站</h2>
           <p class="text-xs text-gray-400 mt-0.5">這台機器是哪一站；設定後收銀台只顯示該站商品、不能切換。只存在這台機器。</p>
@@ -17,7 +19,7 @@
         <div class="px-5 py-4 space-y-2 text-sm">
           <label class="flex items-center gap-2 text-gray-700">
             <input type="radio" name="pos-station" value="" :checked="station === ''" @change="writeStation('')">
-            不指定（各站都能切換，資料機用）
+            不指定（收銀台顯示全部品項，資料機用）
           </label>
           <label v-for="s in stations" :key="s.id" class="flex items-center gap-2 text-gray-700">
             <input type="radio" name="pos-station" :value="s.id" :checked="station === s.id" @change="writeStation(s.id)">
@@ -27,17 +29,19 @@
       </div>
 
       <!-- 站別與資料機 -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">收銀站別</h2>
             <p class="text-xs text-gray-400 mt-0.5">各站共用同一份品項與庫存；品項在「品項管理」勾選上架哪幾站</p>
           </div>
-          <button @click="cat.load()" class="text-sm px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">重新整理</button>
+          <button @click="cat.load()" class="shrink-0 whitespace-nowrap text-sm px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">重新整理</button>
         </div>
         <div class="px-5 py-4 space-y-3 text-sm">
           <p class="text-xs" :class="catState.mode === 'demo' || catState.offline ? 'text-amber-600' : 'text-gray-500'">
-            <template v-if="catState.mode === 'online'">已連線資料機：品項、站別、庫存都存在資料機。</template>
+            <template v-if="catState.mode === 'online'">
+              已連線資料機{{ catState.route === 'hub' ? '（區網連不到，目前經家裡 Hub）' : '（區網）' }}：品項、站別、庫存都存在資料機。
+            </template>
             <template v-else-if="catState.mode === 'tablet'">
               行動平板：{{ catState.offline ? '離線中，用平板上的資料' : '已連線資料機' }}（上次同步 {{ catState.syncedAt || '—' }}）
               <span v-if="catState.pending">・待補送庫存 {{ catState.pending }} 筆</span>
@@ -60,7 +64,7 @@
       </div>
 
       <!-- 電子發票 -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">電子發票</h2>
@@ -76,6 +80,13 @@
             <input type="checkbox" v-model="invEnabled" @change="toggleInvEnabled">
             這台收銀機啟用電子發票（經本機 print-agent 連公司發票伺服器；沒勾時用測試號碼）
           </label>
+          <div class="flex items-center gap-2 text-gray-700">
+            <span class="shrink-0">收銀機密碼</span>
+            <input v-model="stationPw" type="password" autocomplete="off" placeholder="區網連不到資料機時，改走家裡 Hub 用"
+              class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1 text-sm">
+            <button @click="saveStationPw" class="text-xs px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-50">儲存</button>
+          </div>
+          <p class="text-xs text-gray-400 -mt-1">{{ stationPwSaved ? '已設定（只存在這台瀏覽器）' : '還沒設定：區網不通時這台就無法開票、存交易紀錄' }}</p>
           <p v-if="invMsg" class="text-xs" :class="invErr ? 'text-red-600' : 'text-gray-500'">{{ invMsg }}</p>
           <template v-if="inv">
             <div>
@@ -101,7 +112,7 @@
       </div>
 
       <!-- 折扣類型管理 -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">折扣類型</h2>
@@ -162,6 +173,7 @@
         </div>
       </div>
 
+     </div>
     </div>
 
     <!-- 新增/編輯 Modal -->
@@ -260,6 +272,17 @@ const inv      = ref<any>(null)
 const invMsg   = ref('')
 const invErr   = ref(false)
 const invBusy  = ref(false)
+// 收銀機密碼（= Netlify 的 POS_STATION_TOKEN）：只存在這台瀏覽器，畫面不顯示已存的值
+import { stationToken, setStationToken } from '~/utils/stationApi'
+const stationPw = ref('')
+const stationPwSaved = ref(false)
+onMounted(() => { stationPwSaved.value = !!stationToken() })
+function saveStationPw() {
+  if (!stationPw.value.trim()) return
+  setStationToken(stationPw.value)
+  stationPw.value = ''
+  stationPwSaved.value = !!stationToken()
+}
 onMounted(() => { invEnabled.value = einvoiceEnabled(); if (invEnabled.value) loadInv() })
 function toggleInvEnabled() { setEInvoiceEnabled(invEnabled.value); if (invEnabled.value) loadInv(); else { inv.value = null; invMsg.value = '' } }
 async function loadInv() {

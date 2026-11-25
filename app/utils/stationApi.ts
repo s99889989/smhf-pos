@@ -14,6 +14,14 @@ function stationLabel() {
   try { return localStorage.getItem('pos-station') || 'web' } catch { return 'web' }
 }
 
+/** 從錯誤回應取出文字訊息。Nuxt 伺服器的錯誤是 {error: true, statusMessage, message}，error 不是文字，不能直接拿來顯示 */
+export function errorText(data: any, status: number) {
+  for (const v of [data?.data?.message, data?.statusMessage, data?.message, data?.error]) {
+    if (typeof v === 'string' && v.trim()) return v
+  }
+  return `資料機回應 ${status}`
+}
+
 /** 本機回應是否代表「區網連不到資料機」，該改走 Hub */
 export async function lanUnreachable(res: Response) {
   if (res.status !== 503) return false

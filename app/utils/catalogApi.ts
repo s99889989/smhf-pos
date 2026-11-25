@@ -3,7 +3,7 @@
 //   收銀機的 print-agent 轉給資料機；行動平板的 print-agent 留一份鏡像，離線也能賣、回來再補送庫存。
 // 本機 print-agent 沒開或區網連不到資料機時，改走家裡 Hub（/api/station/catalog/**，見 stationApi.ts）。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable } from './stationApi'
+import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 export interface CatalogAll {
   ok: true
@@ -65,7 +65,7 @@ async function call(method: 'GET' | 'POST', sub: string, body?: BodyInit, conten
   }
   const data = await res.json().catch(() => null)
   if (!res.ok || !data?.ok) {
-    throw new CatalogError(data?.error || data?.message || `資料機回應 ${res.status}`, false)
+    throw new CatalogError(errorText(data, res.status), false)
   }
   return data as CatalogAll
 }

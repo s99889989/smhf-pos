@@ -3,7 +3,7 @@
 //   行動平板的 print-agent 留一份鏡像，離線也能選員工 / VIP（修改要連得到資料機）。
 // 本機 print-agent 沒開或區網連不到資料機時，改走家裡 Hub（/api/station/people/**，見 stationApi.ts）。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable } from './stationApi'
+import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 export type PeopleList = 'employees' | 'vipMembers' | 'discountTypes'
 
@@ -49,7 +49,7 @@ async function call(method: 'GET' | 'POST', sub: string, body?: unknown, timeout
     }
   }
   const data = await res.json().catch(() => null)
-  if (!res.ok || !data?.ok) throw new Error(data?.error || data?.message || `資料機回應 ${res.status}`)
+  if (!res.ok || !data?.ok) throw new Error(errorText(data, res.status))
   return data as PeopleAll
 }
 

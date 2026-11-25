@@ -5,7 +5,7 @@
 // 這台收銀機要在「系統設定 → 電子發票」打開「啟用」，沒打開時一律用測試號碼（印「測試號碼」）。
 import { detailRows, type PrintOrder } from './invoicePrint'
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable } from './stationApi'
+import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 const ENABLED_KEY = 'pos-einvoice-enabled'
 
@@ -65,7 +65,7 @@ async function withTimeout(run: (signal?: AbortSignal) => Promise<Response>, ms:
 async function toResult<T>(res: Response): Promise<ApiResult<T>> {
   const json = await res.json().catch(() => null)
   if (res.ok) return { ok: true, data: json as T }
-  const message = json?.data?.message || json?.error || json?.message || json?.statusMessage || `HTTP ${res.status}`
+  const message = errorText(json, res.status)
   return { ok: false, notConfigured: false, message }
 }
 

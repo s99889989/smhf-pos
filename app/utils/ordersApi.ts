@@ -5,7 +5,7 @@
 // 兩條都不通時，訂單先放在這台瀏覽器（localStorage pos-order-outbox），之後每分鐘和下次開網頁時補送。
 // 每筆帶 clientId，重送不會存兩次。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable } from './stationApi'
+import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 const OUTBOX_KEY = 'pos-order-outbox'
 
@@ -108,7 +108,7 @@ export async function listOrders(from: string, to: string): Promise<ListResult> 
   const { res, error } = await post('list', { from, to }, 30000)
   if (!res) return { ok: false, message: error }
   const data = await res.json().catch(() => null)
-  if (!res.ok || !data?.ok) return { ok: false, message: data?.error || data?.message || `資料機回應 ${res.status}` }
+  if (!res.ok || !data?.ok) return { ok: false, message: errorText(data, res.status) }
   return data
 }
 

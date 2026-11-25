@@ -113,7 +113,7 @@
                     'bg-green-100 text-green-700': order.location === 'restaurant',
                     'bg-blue-100 text-blue-700':   order.location === 'shop',
                     'bg-amber-100 text-amber-700':  order.location === 'stall',
-                  }">{{ LOC_LABEL[order.location] }}</span>
+                  }">{{ stationName(order.location) }}</span>
               </td>
               <td class="px-3 py-3 text-gray-600 text-xs max-w-[160px] truncate">
                 {{ order.items.map(i => i.name).join('、') }}
@@ -132,7 +132,7 @@
 <script setup lang="ts">
 import { LOC_LABEL, PAY_LABEL } from '~/composables/usePosStore'
 
-const { orders } = usePosStore()
+const { orders, stations, stationName } = usePosStore()
 
 const mode = ref<'daily' | 'monthly'>('daily')
 
@@ -172,17 +172,14 @@ const stats = computed(() => [
   { label: '現金收入',   value: '$' + cashTotal.value.toLocaleString(), color: 'text-amber-600' },
 ])
 
-const locDefs = [
-  { key: 'restaurant', label: '餐廳' },
-  { key: 'shop',       label: '小舖' },
-  { key: 'stall',      label: '擺攤' },
-]
+// 站別由資料機設定（可自訂）
+const locDefs = computed(() => stations.value.map(s => ({ key: s.id, label: s.name })))
 
 const locStats = computed(() => {
-  const maxTotal = Math.max(1, ...locDefs.map(l =>
+  const maxTotal = Math.max(1, ...locDefs.value.map(l =>
     filteredOrders.value.filter(o => o.location === l.key).reduce((s, o) => s + o.total, 0)
   ))
-  return locDefs.map(l => {
+  return locDefs.value.map(l => {
     const list = filteredOrders.value.filter(o => o.location === l.key)
     const total = list.reduce((s, o) => s + o.total, 0)
     return { ...l, total, count: list.length, pct: Math.round(total / maxTotal * 100) }

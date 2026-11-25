@@ -41,9 +41,17 @@ export interface Product {
   category: string
   note: string
   cashOnly: boolean
-  locations: ('restaurant' | 'shop' | 'stall')[]
+  locations: string[]   // 上架在哪幾個收銀站（站別 id，見 stations；後台可自訂）
   sortOrder: number
   materials: ProductMaterial[]
+  image?: string        // 資料機上的圖片檔名（catalogImageUrl 轉網址）
+}
+
+// 收銀站（1 號餐廳、2 號小舖、行動平板…），存在資料機，可在系統設定新增、改名
+export interface StationDef {
+  id: string
+  name: string
+  sortOrder: number
 }
 
 export interface OrderItem {
@@ -57,7 +65,7 @@ export interface OrderItem {
 export interface Order {
   id: number
   no: string
-  location: 'restaurant' | 'shop' | 'stall'
+  location: string      // 站別 id
   items: OrderItem[]
   subtotal: number
   discount: string
@@ -135,6 +143,7 @@ export interface ShopOrder {
   createdAt: Date
 }
 
+// 預設三站的名稱（連不到資料機時用）；畫面請用 usePosStore().stationName(id)，站名可在後台改
 export const LOC_LABEL: Record<string, string> = {
   restaurant: '餐廳',
   shop: '小舖',
@@ -190,7 +199,27 @@ export function usePosStore() {
   const internalUses = useState<InternalUse[]>('internalUses', () => [])
   const internalUseSeq = useState<number>('internalUseSeq', () => 1)
 
+  // 站別：資料機載入後會換成資料機的清單（useCatalog）
+  const stations = useState<StationDef[]>('stations', () => [
+    { id: 'restaurant', name: '餐廳', sortOrder: 1 },
+    { id: 'shop',       name: '小舖', sortOrder: 2 },
+    { id: 'stall',      name: '擺攤', sortOrder: 3 },
+  ])
+  function stationName(id: string) {
+    return stations.value.find(s => s.id === id)?.name ?? LOC_LABEL[id] ?? id
+  }
+
+  // 連得到資料機時，庫存異動寫到資料機（useCatalog）；範例模式才在這裡直接改
+  function catalogFailed(e: unknown) {
+    alert('寫入資料機失敗：' + ((e as Error)?.message ?? e))
+  }
+
   function addStockIn(materialId: number, quantity: number, note: string, date: Date) {
+    const cat = useCatalog()
+    if (cat.connected()) {
+      cat.stockOp('stock/in', { materialId, quantity, note, date: date.toISOString() }).catch(catalogFailed)
+      return
+    }
     const mat = materials.value.find(m => m.id === materialId)
     if (!mat) return
     mat.stock += quantity
@@ -199,6 +228,11 @@ export function usePosStore() {
   }
 
   function addInternalUse(materialId: number, quantity: number, purpose: string, operator: string, date?: Date) {
+    const cat = useCatalog()
+    if (cat.connected()) {
+      cat.stockOp('stock/use', { materialId, quantity, purpose, operator, date: (date ?? new Date()).toISOString() }).catch(catalogFailed)
+      return
+    }
     const mat = materials.value.find(m => m.id === materialId)
     if (!mat) return
     mat.stock = Math.max(0, mat.stock - quantity)
@@ -212,18 +246,18 @@ export function usePosStore() {
   }
 
   const products = useState<Product[]>('products', () => [
-    { id:1,  name:'午餐－大人',     price:250, category:'套餐',    note:'吃到飽', cashOnly:true,  locations:['restaurant'],               sortOrder:1,  materials:[] },
-    { id:2,  name:'午餐－小孩',     price:180, category:'套餐',    note:'吃到飽', cashOnly:true,  locations:['restaurant'],               sortOrder:2,  materials:[] },
-    { id:3,  name:'巧克力餅乾一盒', price:180, category:'餅乾麵包', note:'30入',  cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:3,  materials:[{materialId:1,quantity:30}] },
-    { id:4,  name:'巧克力餅乾一包', price:45,  category:'餅乾麵包', note:'5入',   cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:4,  materials:[{materialId:1,quantity:5}] },
-    { id:5,  name:'手工麵包',       price:60,  category:'餅乾麵包', note:'',      cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:5,  materials:[{materialId:2,quantity:1}] },
-    { id:6,  name:'鳳梨酥禮盒',     price:320, category:'餅乾麵包', note:'12入',  cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:6,  materials:[{materialId:3,quantity:12}] },
-    { id:7,  name:'有機米 1kg',     price:220, category:'農產品',  note:'',      cashOnly:false, locations:['shop','stall'],              sortOrder:7,  materials:[{materialId:4,quantity:1}] },
-    { id:8,  name:'洛神花醬',       price:150, category:'農產品',  note:'260g',  cashOnly:false, locations:['shop','stall'],              sortOrder:8,  materials:[{materialId:5,quantity:1}] },
-    { id:9,  name:'梅子醋',         price:280, category:'農產品',  note:'500ml', cashOnly:false, locations:['shop','stall'],              sortOrder:9,  materials:[{materialId:6,quantity:1}] },
-    { id:10, name:'有機果汁',       price:80,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant','shop'],         sortOrder:10, materials:[{materialId:7,quantity:1}] },
-    { id:11, name:'花草茶',         price:60,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant','shop'],         sortOrder:11, materials:[{materialId:8,quantity:1}] },
-    { id:12, name:'黑糖薑母茶',     price:70,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant'],               sortOrder:12, materials:[{materialId:9,quantity:1}] },
+    { id:1,  name:'午餐－大人',     price:250, category:'套餐',    note:'吃到飽', cashOnly:true,  locations:['restaurant'],               sortOrder:1,  materials:[], image:'' },
+    { id:2,  name:'午餐－小孩',     price:180, category:'套餐',    note:'吃到飽', cashOnly:true,  locations:['restaurant'],               sortOrder:2,  materials:[], image:'' },
+    { id:3,  name:'巧克力餅乾一盒', price:180, category:'餅乾麵包', note:'30入',  cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:3,  materials:[{materialId:1,quantity:30}], image:'' },
+    { id:4,  name:'巧克力餅乾一包', price:45,  category:'餅乾麵包', note:'5入',   cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:4,  materials:[{materialId:1,quantity:5}], image:'' },
+    { id:5,  name:'手工麵包',       price:60,  category:'餅乾麵包', note:'',      cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:5,  materials:[{materialId:2,quantity:1}], image:'' },
+    { id:6,  name:'鳳梨酥禮盒',     price:320, category:'餅乾麵包', note:'12入',  cashOnly:false, locations:['restaurant','shop','stall'], sortOrder:6,  materials:[{materialId:3,quantity:12}], image:'' },
+    { id:7,  name:'有機米 1kg',     price:220, category:'農產品',  note:'',      cashOnly:false, locations:['shop','stall'],              sortOrder:7,  materials:[{materialId:4,quantity:1}], image:'' },
+    { id:8,  name:'洛神花醬',       price:150, category:'農產品',  note:'260g',  cashOnly:false, locations:['shop','stall'],              sortOrder:8,  materials:[{materialId:5,quantity:1}], image:'' },
+    { id:9,  name:'梅子醋',         price:280, category:'農產品',  note:'500ml', cashOnly:false, locations:['shop','stall'],              sortOrder:9,  materials:[{materialId:6,quantity:1}], image:'' },
+    { id:10, name:'有機果汁',       price:80,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant','shop'],         sortOrder:10, materials:[{materialId:7,quantity:1}], image:'' },
+    { id:11, name:'花草茶',         price:60,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant','shop'],         sortOrder:11, materials:[{materialId:8,quantity:1}], image:'' },
+    { id:12, name:'黑糖薑母茶',     price:70,  category:'飲品',    note:'',      cashOnly:false, locations:['restaurant'],               sortOrder:12, materials:[{materialId:9,quantity:1}], image:'' },
   ])
 
   const orders = useState<Order[]>('orders', () => [])
@@ -233,6 +267,15 @@ export function usePosStore() {
     const no = 'A' + String(orderSeq.value).padStart(4, '0')
     orders.value.unshift({ ...order, id: orderSeq.value, no, createdAt: new Date() })
     orderSeq.value++
+    const cat = useCatalog()
+    if (cat.connected()) {
+      // 扣資料機的共用庫存（送不出去會先存在這台、稍後補送）
+      cat.stockOp('stock/sale', {
+        orderNo: no, station: order.location,
+        items: order.items.map(i => ({ productId: i.productId, qty: i.qty })),
+      }).catch(catalogFailed)
+      return
+    }
     for (const item of order.items) {
       const prod = products.value.find(p => p.id === item.productId)
       if (!prod) continue
@@ -275,6 +318,7 @@ export function usePosStore() {
     materials, stockIns, addStockIn,
     internalUses, addInternalUse,
     products, orders, addOrder,
+    stations, stationName,
     shopOrders, addShopOrder,
     googleAccounts,
   }

@@ -1,27 +1,33 @@
 <template>
-  <!-- 帳單網頁列印版（print-agent 連不到時用）：照 utils/billPrint.ts 的行資料，一行 30 個半形字格 -->
-  <div class="bp-root">
-    <div v-for="(l, i) in lines" :key="i" class="bp-line" :class="{ 'bp-big': l.big, 'bp-center': l.center }">
-      <span v-for="(c, ci) in cells(l.text)" :key="ci" class="bp-cell" :class="{ 'bp-wide': c.wide }">{{ c.ch }}</span>
+  <!-- 帳單網頁列印版（print-agent 連不到時用）：照 utils/billPrint.ts 的 mm 座標與字級，和 print-agent 畫出來的一樣 -->
+  <div class="bp-root" :style="{ width: `${BILL_WIDTH}mm` }">
+    <div v-for="(l, i) in lines" :key="i" class="bp-line" :style="{ height: `${lineHeightMm(l)}mm` }">
+      <div v-if="l.kind === 'rule'" class="bp-rule" />
+      <template v-else-if="l.kind === 'text'">
+        <span v-for="(c, ci) in l.cells" :key="ci" class="bp-cell"
+              :style="cellStyle(c, l.size, !!l.bold)">{{ c.text }}</span>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { BillLine } from '~/utils/billPrint'
+import { BILL_WIDTH, lineHeightMm, type BillCell, type BillLine } from '~/utils/billPrint'
 
 defineProps<{ lines: BillLine[] }>()
-const cells = (s: string) => [...(s || ' ')].map(ch => ({ ch: ch === ' ' ? ' ' : ch, wide: ch.charCodeAt(0) >= 0x80 }))
+
+function cellStyle(c: BillCell, size: number, bold: boolean) {
+  const s: Record<string, string> = { fontSize: `${size}pt`, fontWeight: bold ? '700' : '400' }
+  if (c.align === 'right') { s.right = `${BILL_WIDTH - c.x}mm` }
+  else if (c.align === 'center') { s.left = `${c.x}mm`; s.transform = 'translateX(-50%)' }
+  else s.left = `${c.x}mm`
+  return s
+}
 </script>
 
 <style>
-/* 印字區 48mm、一行 30 格 → 一格 1.6mm（同 58mm 熱感紙帳單） */
-.bp-root { width: 48mm; font-family: 'Noto Sans TC', 'Microsoft JhengHei', monospace; color: #000; }
-.bp-line { display: flex; height: 3.75mm; line-height: 3.75mm; font-size: 2.9mm; white-space: pre; }
-.bp-center { justify-content: center; }
-.bp-cell { display: inline-block; width: 1.6mm; text-align: center; overflow: visible; }
-.bp-wide { width: 3.2mm; }
-.bp-big { height: 7.5mm; line-height: 7.5mm; font-size: 5.8mm; font-weight: 700; }
-.bp-big .bp-cell { width: 3.2mm; }
-.bp-big .bp-wide { width: 6.4mm; }
+.bp-root { font-family: '細明體', 'MingLiU', 'PMingLiU', 'Noto Serif TC', serif; color: #000; }
+.bp-line { position: relative; }
+.bp-cell { position: absolute; top: 0; white-space: pre; line-height: 1; }
+.bp-rule { position: absolute; left: 0; right: 0; top: 50%; border-top: 0.2mm solid #000; }
 </style>

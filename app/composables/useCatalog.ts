@@ -1,0 +1,170 @@
+// composables/useCatalog.ts
+// 站別、商品主檔、原料庫存與商品圖片統一存在公司資料機（print-agent Catalog.cs）。
+// 這裡負責：開網頁時載入、各頁面修改時寫回資料機、結帳後扣資料機庫存。
+// 連不到 print-agent（例如開發電腦）時是「範例模式」：用 usePosStore 內建的範例資料，改了只在這個分頁有效。
+import type { Product, Material, StockIn, InternalUse, StationDef } from './usePosStore'
+import { catalogAll, catalogPost, catalogUploadImage, CatalogError, type CatalogAll } from '~/utils/catalogApi'
+import { prepareImage } from '~/utils/imageUpload'
+
+export interface CatalogState {
+  mode: 'loading' | 'demo' | 'online' | 'tablet'
+  offline: boolean          // 平板：目前連不到資料機（用鏡像）
+  pending: number           // 平板：還沒補送到資料機的庫存異動筆數
+  syncedAt: string
+  error: string             // 最近一次載入 / 儲存失敗原因
+}
+
+const PENDING_KEY = 'pos-stock-pending' // 收銀機：結帳扣庫存送不出去時先存這裡，下次載入再補送
+
+function readPending(): { sub: string; body: any }[] {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]') } catch { return [] }
+}
+function writePending(list: { sub: string; body: any }[]) {
+  try { list.length ? localStorage.setItem(PENDING_KEY, JSON.stringify(list)) : localStorage.removeItem(PENDING_KEY) } catch { /* 無痕 */ }
+}
+function newClientId() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
+}
+
+export function useCatalog() {
+  const store = usePosStore()
+  const state = useState<CatalogState>('catalogState', () => ({ mode: 'loading', offline: false, pending: 0, syncedAt: '', error: '' }))
+
+  const connected = () => state.value.mode === 'online' || state.value.mode === 'tablet'
+
+  function apply(d: CatalogAll) {
+    store.stations.value = d.stations.map(s => ({ id: String(s.id), name: s.name, sortOrder: Number(s.sortOrder) || 0 }))
+    store.products.value = d.products.map((p): Product => ({
+      id: p.id, name: p.name, price: Number(p.price) || 0, category: p.category || '', note: p.note || '',
+      cashOnly: !!p.cashOnly, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
+      materials: (p.materials || []).map((m: any) => ({ materialId: m.materialId, quantity: Number(m.quantity) || 0 })),
+      image: p.image || '',
+    }))
+    store.materials.value = d.materials.map((m): Material => ({
+      id: m.id, name: m.name, unit: m.unit || '', stock: Number(m.stock) || 0, alertStock: Number(m.alertStock) || 0, source: m.source || '',
+    }))
+    const logs = d.logs || []
+    store.stockIns.value = logs.filter(l => l.type === 'in').map((l): StockIn => ({
+      id: l.id, materialId: l.materialId, materialName: l.materialName, quantity: Number(l.quantity) || 0,
+      source: l.source || '', note: l.note || '', createdAt: new Date(l.createdAt),
+    }))
+    store.internalUses.value = logs.filter(l => l.type === 'use').map((l): InternalUse => ({
+      id: l.id, materialId: l.materialId, materialName: l.materialName, quantity: Number(l.quantity) || 0,
+      purpose: l.purpose || '', operator: l.operator || '', createdAt: new Date(l.createdAt),
+    }))
+    state.value = {
+      mode: d.mode === 'tablet' ? 'tablet' : 'online',
+      offline: !!d.offline,
+      pending: d.pending ?? 0,
+      syncedAt: d.syncedAt || '',
+      error: d.offline ? `離線中，用平板上的資料（${d.syncedAt || '尚未同步'}）` : '',
+    }
+  }
+
+  async function load() {
+    try {
+      const d = await catalogAll()
+      apply(d)
+      await flushPending()
+    } catch (e) {
+      // 第一次就連不到：範例模式；之前連過：保留畫面上的資料、顯示錯誤
+      if (!connected()) state.value = { ...state.value, mode: 'demo', error: (e as Error).message }
+      else state.value = { ...state.value, error: (e as Error).message }
+    }
+  }
+
+  async function flushPending() {
+    const list = readPending()
+    if (!list.length) return
+    const left: typeof list = []
+    for (const job of list) {
+      try { apply(await catalogPost(job.sub, job.body)) } catch (e) {
+        if (e instanceof CatalogError && !e.unreachable && !/連不到資料機/.test(e.message)) continue // 資料機拒收（例如品項已刪）：丟掉
+        left.push(job)
+      }
+    }
+    writePending(left)
+  }
+
+  /** 修改類：一定要連得到資料機才做（範例模式則只改畫面） */
+  async function mutate(sub: string, body: unknown, demo: () => void) {
+    if (!connected()) { demo(); return }
+    apply(await catalogPost(sub, body))
+  }
+
+  // ---- 站別 ----
+  const saveStation = (s: Partial<StationDef> & { name: string }) => mutate('station/save', s, () => {
+    const list = store.stations.value
+    const cur = s.id ? list.find(x => x.id === s.id) : undefined
+    if (cur) cur.name = s.name
+    else list.push({ id: 's' + Date.now(), name: s.name, sortOrder: list.length + 1 })
+  })
+  const deleteStation = (id: string) => mutate('station/delete', { id }, () => {
+    store.stations.value = store.stations.value.filter(s => s.id !== id)
+    store.products.value.forEach(p => { p.locations = p.locations.filter(l => l !== id) })
+  })
+
+  // ---- 商品 ----
+  const saveProduct = (p: Omit<Product, 'id' | 'image'> & { id?: number | null }) => mutate('product/save', p, () => {
+    const list = store.products.value
+    const idx = p.id ? list.findIndex(x => x.id === p.id) : -1
+    if (idx >= 0) list[idx] = { ...list[idx]!, ...p, id: list[idx]!.id }
+    else list.push({ ...p, id: Math.max(0, ...list.map(x => x.id)) + 1, image: '' })
+  })
+  const deleteProduct = (id: number) => mutate('product/delete', { id }, () => {
+    store.products.value = store.products.value.filter(p => p.id !== id)
+  })
+  async function setProductImage(id: number, file: File) {
+    const jpg = await prepareImage(file)
+    if (!connected()) {
+      const p = store.products.value.find(x => x.id === id)
+      if (p) p.image = URL.createObjectURL(jpg) // 範例模式：只在這個分頁看得到
+      return
+    }
+    apply(await catalogUploadImage(id, jpg))
+  }
+  const clearProductImage = (id: number) => mutate('product/image-clear', { id }, () => {
+    const p = store.products.value.find(x => x.id === id)
+    if (p) p.image = ''
+  })
+
+  // ---- 原料 ----
+  async function saveMaterial(m: Omit<Material, 'id'> & { id?: number | null }) {
+    const old = m.id ? store.materials.value.find(x => x.id === m.id) : undefined
+    await mutate('material/save', m, () => {
+      const list = store.materials.value
+      if (old) Object.assign(old, m, { id: old.id })
+      else list.push({ ...m, id: Math.max(0, ...list.map(x => x.id)) + 1 })
+    })
+    // 編輯時直接改了庫存數字 = 盤點調整（資料機會記一筆 adjust）
+    if (connected() && old && m.stock !== old.stock)
+      apply(await catalogPost('stock/adjust', { materialId: old.id, stock: m.stock, note: '物料編輯直接修改庫存', clientId: newClientId() }))
+  }
+  const deleteMaterial = (id: number) => mutate('material/delete', { id }, () => {
+    store.materials.value = store.materials.value.filter(m => m.id !== id)
+  })
+
+  // ---- 庫存異動（usePosStore 的 addStockIn / addInternalUse / addOrder 呼叫）----
+  async function stockOp(sub: string, body: Record<string, unknown>) {
+    const job = { sub, body: { ...body, clientId: newClientId() } }
+    try {
+      apply(await catalogPost(job.sub, job.body))
+    } catch (e) {
+      // 結帳不能因為扣庫存失敗卡住：先記在這台，下次載入補送（資料機用 clientId 去重）
+      if (sub === 'stock/sale' && (!(e instanceof CatalogError) || e.unreachable || /連不到資料機/.test(e.message))) {
+        writePending([...readPending(), job])
+        state.value = { ...state.value, error: '扣庫存暫時送不到資料機，稍後自動補送' }
+        return
+      }
+      throw e
+    }
+  }
+
+  return {
+    state, connected, load,
+    saveStation, deleteStation,
+    saveProduct, deleteProduct, setProductImage, clearProductImage,
+    saveMaterial, deleteMaterial,
+    stockOp,
+  }
+}

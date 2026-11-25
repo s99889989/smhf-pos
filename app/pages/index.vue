@@ -6,6 +6,12 @@
 
       <!-- 地點切換 -->
       <div class="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3">
+        <!-- 本機已設收銀站（系統設定）：鎖定，只顯示該站 -->
+        <template v-if="station">
+          <span class="px-4 py-1.5 rounded-full text-sm font-medium border bg-green-700 text-white border-green-700">本機：{{ stationName(station) }}</span>
+          <NuxtLink to="/settings" class="text-xs text-gray-400 hover:text-gray-600">更改</NuxtLink>
+        </template>
+        <template v-else>
         <button
                 v-for="loc in locations" :key="loc.value"
                 @click="curLoc = loc.value"
@@ -14,6 +20,7 @@
             ? 'bg-green-700 text-white border-green-700'
             : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'"
         >{{ loc.label }}</button>
+        </template>
       </div>
 
       <!-- 分類 -->
@@ -41,6 +48,11 @@
           <span v-if="cartQty(prod.id)" class="absolute top-2 right-2 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {{ cartQty(prod.id) }}
           </span>
+          <!-- 商品圖（資料機縮圖）：載不到就只顯示文字 -->
+          <div v-if="prod.image && !imgErrors.has(prod.image)" class="-mx-3.5 -mt-3.5 mb-2 aspect-[4/3] overflow-hidden rounded-t-xl bg-gray-100">
+            <img :src="thumbUrl(prod.image)" :alt="prod.name" loading="lazy" decoding="async"
+                 class="w-full h-full object-cover" @error="imgErrors.add(prod.image)">
+          </div>
           <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
           <div class="flex items-baseline gap-1.5">
             <div class="text-base font-bold text-green-700">${{ discountedPrice(prod.price) }}</div>
@@ -270,7 +282,10 @@
         >
         <div class="flex gap-2">
           <button @click="showCarrierModal = false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
-          <button @click="confirmCheckout" class="flex-1 py-2.5 rounded-xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800">確認結帳</button>
+          <button @click="confirmCheckout" :disabled="issuing"
+                  class="flex-1 py-2.5 rounded-xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-60">
+            {{ issuing ? '開立發票中…' : '確認結帳' }}
+          </button>
         </div>
       </div>
     </div>
@@ -291,7 +306,7 @@
               <span class="text-gray-800 font-mono font-medium">{{ lastOrder.invoiceNo }}</span>
             </div>
             <div class="flex justify-between"><span>日期</span><span class="text-gray-800">{{ formatDate(lastOrder.createdAt) }}</span></div>
-            <div class="flex justify-between"><span>地點</span><span class="text-gray-800">{{ LOC_LABEL[lastOrder.location] }}</span></div>
+            <div class="flex justify-between"><span>地點</span><span class="text-gray-800">{{ stationName(lastOrder.location) }}</span></div>
             <div v-if="lastOrder.discountLabel" class="flex justify-between">
               <span>折扣</span><span class="text-purple-600 font-medium">{{ lastOrder.discountLabel }}</span>
             </div>
@@ -364,18 +379,22 @@
 
 <script setup lang="ts">
   import { LOC_LABEL, PAY_LABEL } from '~/composables/usePosStore'
+  import { loadStation } from '~/composables/useStation'
+  import { catalogImageUrl } from '~/utils/catalogApi'
   import type { Product, DiscountType } from '~/composables/usePosStore'
   import { buildInvoiceLayout, buildEscPosJob } from '~/utils/invoicePrint'
-  import { printViaAgent } from '~/utils/printAgent'
-  import { buildBillLines, buildBillEscPos, type BillLine, type BillOrder } from '~/utils/billPrint'
+  import { printViaAgent, printBillViaAgent } from '~/utils/printAgent'
+  import { issueEInvoice, formatInvoiceNo } from '~/utils/einvoiceApi'
+  import { buildBillLines, type BillLine, type BillOrder } from '~/utils/billPrint'
 
-  const { products, discountTypes, employees, vipMembers, addOrder } = usePosStore()
+  const { products, discountTypes, employees, vipMembers, addOrder, stations, stationName } = usePosStore()
 
-  const locations = [
-    { value: 'restaurant', label: '餐廳' },
-    { value: 'shop',       label: '小舖' },
-    { value: 'stall',      label: '擺攤' },
-  ] as const
+  // 站別由資料機設定（系統設定可新增、改名）
+  const locations = computed(() => stations.value.map(s => ({ value: s.id, label: s.name })))
+
+  // 商品圖片：資料機上的縮圖（blob: 是範例模式剛選的圖）
+  const imgErrors = reactive(new Set<string>())
+  const thumbUrl = (file: string) => file.startsWith('blob:') ? file : catalogImageUrl(file)
 
 
   const payMethods = [
@@ -387,7 +406,7 @@
 
   const enabledDiscounts = computed(() => discountTypes.value.filter(d => d.enabled))
 
-  const curLoc      = ref<'restaurant' | 'shop' | 'stall'>('restaurant')
+  const curLoc      = ref<string>('restaurant')
   const curCat      = ref('全部')
   const curPay      = ref<'cash' | 'card' | 'hua' | 'voucher'>('cash')
   const voucherAmount = ref(0)
@@ -429,8 +448,8 @@
   const lastOrder        = ref<any>(null)
   const invoicePrintRef  = ref<{ ready: () => Promise<void> } | null>(null)
   // 發票版面（證明聯 + 交易明細）。條碼 / QR 的內容也在 utils/invoicePrint.ts 產生。
-  // TODO 串接正式電子發票後：用正式號碼、隨機碼與 AES 驗證碼取代模擬值；證明聯依規定只能印一次。
-  const printLayout = computed(() => lastOrder.value ? buildInvoiceLayout(lastOrder.value) : null)
+  // 號碼、隨機碼、AES 驗證碼由後端（server/api/einvoice/issue）產生；證明聯依規定只能印一次。
+  const printLayout = computed(() => lastOrder.value ? buildInvoiceLayout(lastOrder.value, lastOrder.value.invoiceAes) : null)
 
   const selectedStaffId  = ref('')
   const vipInput         = ref('')   // 已選取的 VIP 號碼
@@ -474,6 +493,15 @@
     showVipModal.value = false
     openCarrierModal()
   }
+
+  // 本機收銀站：設了就鎖定（地點切換鈕隱藏），只顯示該站商品
+  const station = useStation()
+  watch(station, (v) => { if (v) curLoc.value = v }, { immediate: true })
+  // 站別清單換了（資料機載入、改名刪除）：目前的站不在清單裡就選第一站
+  watch(stations, (list) => {
+    if (!station.value && list.length && !list.some(s => s.id === curLoc.value)) curLoc.value = list[0]!.id
+  })
+  onMounted(loadStation)
 
   // 預設選第一個折扣
   onMounted(() => {
@@ -526,9 +554,9 @@
   const locProducts = computed(() =>
           products.value.filter(p => p.locations.includes(curLoc.value)).sort((a, b) => a.sortOrder - b.sortOrder)
   )
-  const categories = computed(() => ['全部', ...new Set(locProducts.value.map(p => p.category))])
+  const categories = computed(() => ['全部', ...new Set(locProducts.value.map(p => p.category || '其他'))])
   const filteredProducts = computed(() =>
-          curCat.value === '全部' ? locProducts.value : locProducts.value.filter(p => p.category === curCat.value)
+          curCat.value === '全部' ? locProducts.value : locProducts.value.filter(p => (p.category || '其他') === curCat.value)
   )
   const subtotal = computed(() => cart.value.reduce((s, i) => s + i.price * i.qty, 0))
   const total    = computed(() => cart.value.reduce((s, i) => s + i.finalPrice * i.qty, 0))
@@ -547,9 +575,7 @@
     nextTick(() => carrierInput.value?.focus())
   }
 
-  // TODO: 目前為模擬發票號碼，僅供測試列印排版用。
-  // 之後串接電子發票 API（如綠界/ezPay等）後，改成用 API 回傳的正式發票號碼、
-  // 隨機碼、QR Code 內容取代這裡的假資料。
+  // 模擬發票號碼：這台收銀機沒在系統設定啟用電子發票時使用，紙本會印「測試號碼」。
   function genMockInvoiceNo() {
     const letters = 'AB'[Math.floor(Math.random() * 2)] + 'CDEFGHJKLMNPQRSTUVXYZ'[Math.floor(Math.random() * 21)]
     const digits = String(Math.floor(Math.random() * 1e8)).padStart(8, '0')
@@ -559,8 +585,10 @@
     return String(Math.floor(Math.random() * 1e4)).padStart(4, '0')
   }
 
+  const issuing = ref(false)
+
   async function confirmCheckout() {
-    showCarrierModal.value = false
+    if (issuing.value) return
     const va = Math.min(voucherAmount.value, total.value)
     const payDetail = curPay.value === 'mixed' && va > 0
             ? `消費券 $${va} + 現金 $${total.value - va}`
@@ -581,13 +609,38 @@
       change: change.value >= 0 ? change.value : 0,
       payMethod: curPay.value,
       payDetail,
-      carrier: carrier.value,
-      invoiceNo: genMockInvoiceNo(),
-      invoiceRandomCode: genMockRandomCode(),
-      invoiceIsMock: true,
+      carrier: carrier.value.trim().toUpperCase(),
+      invoiceNo: '',
+      invoiceRandomCode: '',
+      invoiceAes: '',
+      invoiceIsMock: false,
     }
+
+    // 向後端開立電子發票（配號 + 隨機碼 + QR 驗證碼）；上傳由後端處理
+    issuing.value = true
+    const r = await issueEInvoice({ items: order.items, subtotal: order.subtotal, total: order.total, carrier: order.carrier })
+    issuing.value = false
+    let issuedAt: Date | null = null
+    if (r.ok) {
+      order.invoiceNo = formatInvoiceNo(r.data.invoiceNo)
+      order.invoiceRandomCode = r.data.randomCode
+      order.invoiceAes = r.data.aes
+      issuedAt = new Date(r.data.issuedAt)
+    } else if (r.notConfigured) {
+      console.warn('未啟用電子發票，改用測試號碼：', r.message)
+      order.invoiceNo = genMockInvoiceNo()
+      order.invoiceRandomCode = genMockRandomCode()
+      order.invoiceIsMock = true
+    } else {
+      alert(`發票開立失敗，這筆還沒結帳：\n${r.message}`)
+      return
+    }
+    showCarrierModal.value = false
+
     addOrder(order)
     const { orders } = usePosStore()
+    // 發票日期以伺服器開立時間為準（收銀電腦時鐘可能不準）
+    if (issuedAt) orders.value[0]!.createdAt = issuedAt
     lastOrder.value = orders.value[0]
     showReceipt.value = true
     cart.value = []
@@ -641,7 +694,7 @@
   const billLines = ref<BillLine[] | null>(null)
   async function printBill(order: BillOrder) {
     const lines = buildBillLines(order)
-    if (await printViaAgent(buildBillEscPos(lines), 4000, 'bill')) return
+    if (await printBillViaAgent(lines)) return
     billLines.value = lines
     await nextTick()
     document.body.classList.add('print-bill')

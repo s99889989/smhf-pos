@@ -8,6 +8,98 @@
 
     <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6 max-w-2xl">
 
+      <!-- 本機收銀站 -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="text-sm font-semibold text-gray-800">本機收銀站</h2>
+          <p class="text-xs text-gray-400 mt-0.5">這台機器是哪一站；設定後收銀台只顯示該站商品、不能切換。只存在這台機器。</p>
+        </div>
+        <div class="px-5 py-4 space-y-2 text-sm">
+          <label class="flex items-center gap-2 text-gray-700">
+            <input type="radio" name="pos-station" value="" :checked="station === ''" @change="writeStation('')">
+            不指定（各站都能切換，資料機用）
+          </label>
+          <label v-for="s in stations" :key="s.id" class="flex items-center gap-2 text-gray-700">
+            <input type="radio" name="pos-station" :value="s.id" :checked="station === s.id" @change="writeStation(s.id)">
+            {{ s.name }}
+          </label>
+        </div>
+      </div>
+
+      <!-- 站別與資料機 -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-800">收銀站別</h2>
+            <p class="text-xs text-gray-400 mt-0.5">各站共用同一份品項與庫存；品項在「品項管理」勾選上架哪幾站</p>
+          </div>
+          <button @click="cat.load()" class="text-sm px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">重新整理</button>
+        </div>
+        <div class="px-5 py-4 space-y-3 text-sm">
+          <p class="text-xs" :class="catState.mode === 'demo' || catState.offline ? 'text-amber-600' : 'text-gray-500'">
+            <template v-if="catState.mode === 'online'">已連線資料機：品項、站別、庫存都存在資料機。</template>
+            <template v-else-if="catState.mode === 'tablet'">
+              行動平板：{{ catState.offline ? '離線中，用平板上的資料' : '已連線資料機' }}（上次同步 {{ catState.syncedAt || '—' }}）
+              <span v-if="catState.pending">・待補送庫存 {{ catState.pending }} 筆</span>
+            </template>
+            <template v-else-if="catState.mode === 'demo'">範例模式：連不到本機 print-agent / 資料機，畫面上的品項是範例，修改不會保存。（{{ catState.error }}）</template>
+            <template v-else>載入中…</template>
+          </p>
+          <p v-if="catState.error && catState.mode !== 'demo'" class="text-xs text-red-600">{{ catState.error }}</p>
+          <div v-for="s in stations" :key="s.id" class="flex items-center gap-2">
+            <input v-model="stationNames[s.id]" type="text" class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
+            <button @click="renameStation(s.id)" :disabled="!stationNames[s.id] || stationNames[s.id] === s.name"
+                    class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">改名</button>
+            <button @click="removeStation(s.id, s.name)" class="text-xs text-red-400 hover:underline">刪除</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <input v-model="newStation" type="text" placeholder="新增站別，例：市集" class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
+            <button @click="addStation" :disabled="!newStation.trim()" class="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40">新增</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 電子發票 -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-800">電子發票</h2>
+            <p class="text-xs text-gray-400 mt-0.5">加值中心 Cetustek：號碼批次、上傳狀態</p>
+          </div>
+          <div class="flex gap-2">
+            <button @click="loadInv" class="text-sm px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">重新整理</button>
+            <button @click="runInv" :disabled="invBusy" class="text-sm px-3 py-1.5 rounded-xl bg-green-700 text-white hover:bg-green-800 disabled:opacity-60">立即補傳</button>
+          </div>
+        </div>
+        <div class="px-5 py-4 space-y-3 text-sm">
+          <label class="flex items-center gap-2 text-gray-700">
+            <input type="checkbox" v-model="invEnabled" @change="toggleInvEnabled">
+            這台收銀機啟用電子發票（經本機 print-agent 連公司發票伺服器；沒勾時用測試號碼）
+          </label>
+          <p v-if="invMsg" class="text-xs" :class="invErr ? 'text-red-600' : 'text-gray-500'">{{ invMsg }}</p>
+          <template v-if="inv">
+            <div>
+              <div class="text-xs text-gray-400 mb-1">號碼批次（本期 {{ inv.term }} 與下一期）</div>
+              <div v-if="!inv.batches.length" class="text-xs text-amber-600">還沒有號碼，第一次開票或補傳時會自動向加值中心取號</div>
+              <div v-for="b in inv.batches" :key="b.track + b.start_no" class="flex justify-between font-mono text-xs py-0.5">
+                <span>{{ b.roc_year }}年{{ b.term }}月 {{ b.track }}{{ b.start_no }}–{{ b.end_no }}</span>
+                <span :class="b.next_no > b.end_no ? 'text-gray-400' : 'text-green-700'">
+                  {{ b.next_no > b.end_no ? '已用完' : `剩 ${b.end_no - b.next_no + 1} 張` }}
+                </span>
+              </div>
+            </div>
+            <div class="text-xs text-gray-600">
+              待上傳 {{ inv.counts.pending_upload }} 張<span v-if="inv.counts.failing_upload" class="text-red-600">（連續失敗 {{ inv.counts.failing_upload }} 張）</span>
+              ・待作廢 {{ inv.counts.pending_cancel }} 張
+              <span v-if="inv.counts.cancel_need_approval" class="text-red-600">・需核准文號 {{ inv.counts.cancel_need_approval }} 張</span>
+            </div>
+            <div v-for="p in inv.problems" :key="p.invoice_no" class="text-xs text-red-600 font-mono">
+              {{ p.invoice_no }} {{ p.upload_status === 'pending' ? `上傳失敗×${p.upload_attempts}：${p.upload_msg}` : `作廢：${p.cancel_msg ?? p.cancel_status}` }}
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- 折扣類型管理 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -138,6 +230,51 @@
 import type { DiscountType } from '~/composables/usePosStore'
 
 const { discountTypes } = usePosStore()
+
+// ---- 本機收銀站 ----
+import { writeStation, loadStation } from '~/composables/useStation'
+const station = useStation()
+onMounted(loadStation)
+
+// ---- 站別（存資料機）----
+const { stations } = usePosStore()
+const cat = useCatalog()
+const catState = cat.state
+const stationNames = reactive<Record<string, string>>({})
+watch(stations, (list) => { for (const s of list) stationNames[s.id] = s.name }, { immediate: true, deep: true })
+const newStation = ref('')
+async function run(fn: () => Promise<unknown>) {
+  try { await fn() } catch (e) { alert((e as Error).message) }
+}
+const addStation = () => run(async () => { await cat.saveStation({ name: newStation.value.trim() }); newStation.value = '' })
+const renameStation = (id: string) => run(() => cat.saveStation({ id, name: (stationNames[id] ?? '').trim() }))
+function removeStation(id: string, name: string) {
+  if (!confirm(`刪除站別「${name}」？品項上的這個站會一起拿掉。`)) return
+  run(async () => { await cat.deleteStation(id); if (station.value === id) writeStation('') })
+}
+
+// ---- 電子發票 ----
+import { einvoiceEnabled, setEInvoiceEnabled, einvoiceStatus, runEInvoiceQueue } from '~/utils/einvoiceApi'
+const invEnabled = ref(false)
+const inv      = ref<any>(null)
+const invMsg   = ref('')
+const invErr   = ref(false)
+const invBusy  = ref(false)
+onMounted(() => { invEnabled.value = einvoiceEnabled(); if (invEnabled.value) loadInv() })
+function toggleInvEnabled() { setEInvoiceEnabled(invEnabled.value); if (invEnabled.value) loadInv(); else { inv.value = null; invMsg.value = '' } }
+async function loadInv() {
+  const r = await einvoiceStatus()
+  invErr.value = !r.ok
+  if (r.ok) { inv.value = r.data; invMsg.value = '' } else invMsg.value = r.message
+}
+async function runInv() {
+  invBusy.value = true
+  const r = await runEInvoiceQueue()
+  invBusy.value = false
+  invErr.value = !r.ok
+  invMsg.value = r.ok ? `補傳 ${r.data.uploads.length} 張、作廢 ${r.data.cancels.length} 張${r.data.batch ? `，取號：${r.data.batch}` : ''}` : r.message
+  if (r.ok) loadInv()
+}
 
 function rateLabel(rate: number) {
   const n = rate * 10

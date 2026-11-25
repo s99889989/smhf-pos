@@ -310,6 +310,7 @@
 import type { Material } from '~/composables/usePosStore'
 
 const { materials, stockIns, addStockIn } = usePosStore()
+const cat = useCatalog()
 
 const tabs = [
   { value: 'stock',   label: '庫存列表' },
@@ -424,21 +425,17 @@ function openEdit(mat: Material) {
   form.value = { name: mat.name, unit: mat.unit, stock: mat.stock, alertStock: mat.alertStock, source: mat.source }
   showModal.value = true
 }
-function saveMaterial() {
+// 物料與庫存存在資料機（useCatalog）；連不到時是範例模式，只改畫面
+async function saveMaterial() {
   if (!form.value.name || !form.value.unit) return
-  if (editId.value) {
-    const idx = materials.value.findIndex(m => m.id === editId.value)
-    if (idx >= 0) materials.value[idx] = { ...materials.value[idx], ...form.value }
-  } else {
-    const newId = Math.max(0, ...materials.value.map(m => m.id)) + 1
-    materials.value.push({ id: newId, ...form.value })
-  }
-  showModal.value = false
+  try {
+    await cat.saveMaterial({ ...form.value, id: editId.value })
+    showModal.value = false
+  } catch (e) { alert((e as Error).message) }
 }
-function deleteMaterial(id: number) {
+async function deleteMaterial(id: number) {
   if (!confirm('確定刪除此物料？')) return
-  const idx = materials.value.findIndex(m => m.id === id)
-  if (idx >= 0) materials.value.splice(idx, 1)
+  try { await cat.deleteMaterial(id) } catch (e) { alert((e as Error).message) }
 }
 function formatTime(d: Date) {
   return new Date(d).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })

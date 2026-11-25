@@ -36,3 +36,30 @@ export async function printViaAgent(ops: EscOp[], timeoutMs = 4000, target: 'inv
     if (timer) clearTimeout(timer)
   }
 }
+
+// 帳單：版面（mm 座標 + 字級）交給 print-agent 1.2 用 Windows 驅動畫到帳單機（同舊 BK35 帳單的印法）
+export async function printBillViaAgent(lines: unknown[], timeoutMs = 6000): Promise<boolean> {
+  const url = printAgentUrl()
+  if (url === 'off') return false
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null
+  try {
+    const res = await fetch(`${url}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ target: 'bill', gdi: lines }),
+      signal: ctrl?.signal,
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok || !body?.ok) {
+      console.warn('print-agent 帳單列印失敗（print-agent 要 1.2 以上）', body?.error ?? res.status)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('連不到 print-agent，帳單改用瀏覽器列印', e)
+    return false
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}

@@ -1,0 +1,28 @@
+# Netlify 設定
+# 正式部署由 GitHub Actions（.github/workflows/deploy.yml）用 Netlify CLI 建置上傳，不吃 Netlify 建置分鐘數。
+# Netlify 後台設成「Stop builds」後，下面的 ignore 規則只在重新開啟自動建置時才有作用。
+#
+# ignore 指令的規則：exit 0 = 跳過這次建置；exit 1 = 照常建置。
+
+[build]
+  # Nuxt 4 在 Netlify 上的標準設定（Nitro 用 netlify preset，輸出到 dist）
+  command = "pnpm run build"
+  publish = "dist"
+  # 只有改到會影響網站的檔案才建置（文件、編輯器設定、log 不觸發）。
+  ignore = '''
+    if [ -z "$CACHED_COMMIT_REF" ] || [ "$CACHED_COMMIT_REF" = "$COMMIT_REF" ]; then exit 1; fi
+    git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- . \
+      ':(exclude).github' \
+      ':(exclude).idea' \
+      ':(exclude)*.md' \
+      ':(exclude)*.log' \
+      ':(exclude)smhf-pos.xml'
+  '''
+
+# PR 預覽：一律不建置。
+[context.deploy-preview]
+  ignore = "exit 0"
+
+# 非 master 分支的分支部署：一律不建置。
+[context.branch-deploy]
+  ignore = "exit 0"

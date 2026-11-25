@@ -1,0 +1,58 @@
+# 在 GitHub Actions 建置並部署到 Netlify（正式站），做法與聖母農莊系統相同。
+# 目的：push 後由 GitHub 編譯，不用本機編譯，也不使用 Netlify 的建置分鐘數。
+# 用 Netlify CLI 上傳已建置好的檔案，不算 Netlify 的建置分鐘數。
+#
+# 需要先在 GitHub repo → Settings → Secrets and variables → Actions 新增：
+#   NETLIFY_AUTH_TOKEN：Netlify → User settings → Applications → Personal access tokens 產生（可沿用農莊系統那組）
+#   NETLIFY_SITE_ID：Netlify → 收銀系統的網站 → Site configuration → Site details → Site ID
+# 並在 Netlify 後台 Build & deploy → Build settings 選「Stop builds」，避免 Netlify 自己又建置一次。
+#
+# 網站用的環境變數仍在 Netlify 後台設定，CLI 建置時會自動讀取。
+
+name: deploy
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '.idea/**'
+      - '**/*.md'
+      - '**/*.log'
+      - 'smhf-pos.xml'
+  # 也可以在 GitHub → Actions → deploy 手動按「Run workflow」部署
+  workflow_dispatch:
+
+# 短時間內連續推送時，只部署最新的一次，舊的直接取消（省 GitHub 分鐘數）
+concurrency:
+  group: netlify-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          # 在 GitHub 上建置時 Nuxt 偵測不到 Netlify，會改用 node-server 輸出到 .output；
+          # 強制用 netlify preset，才會輸出 dist 與 .netlify/functions-internal。
+          NITRO_PRESET: netlify
+        run: npx -y netlify-cli deploy --build --prod --message "GitHub ${{ github.sha }}"

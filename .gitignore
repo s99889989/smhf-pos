@@ -24,3 +24,6 @@ logs
 !.env.example
 
 repomix-output.xml
+
+# Netlify CLI 本機產物
+.netlify

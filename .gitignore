@@ -27,3 +27,6 @@ repomix-output.xml
 
 # Netlify CLI 本機產物
 .netlify
+
+# 收銀電腦用的列印小程式，只放在公司電腦，不上傳
+print-agent/

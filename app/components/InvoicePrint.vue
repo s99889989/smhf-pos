@@ -31,14 +31,16 @@ const images = ref<Record<string, string>>({})
 
 const mm = (dots: number) => `${dots / 8}mm`
 const cells = (s: string) => [...s].map(ch => ({ ch: ch === ' ' ? ' ' : ch, wide: ch.charCodeAt(0) >= 0x80 }))
-const qrSize = (data: string) => QRCode.create(data, { errorCorrectionLevel: 'M' }).modules.size
+// 用位元組模式（同熱感機 GS ( k），預覽的 QR 版本和大小才會跟實印一樣
+const qrSeg = (data: string) => [{ data, mode: 'byte' as const }]
+const qrSize = (data: string) => QRCode.create(qrSeg(data), { errorCorrectionLevel: 'M' }).modules.size
 
 async function render() {
   const out: Record<string, string> = {}
   for (const [pi, p] of pages.value.entries()) {
     for (const [i, el] of p.els.entries()) {
       if (el.kind === 'qr') {
-        out[`${pi}-${i}`] = await QRCode.toDataURL(el.data, { errorCorrectionLevel: 'M', margin: 0, scale: 6 })
+        out[`${pi}-${i}`] = await QRCode.toDataURL(qrSeg(el.data), { errorCorrectionLevel: 'M', margin: 0, scale: 6 })
       } else if (el.kind === 'barcode') {
         const canvas = document.createElement('canvas')
         JsBarcode(canvas, el.data, { format: 'CODE39', displayValue: false, margin: 0, width: 2, height: 100 })

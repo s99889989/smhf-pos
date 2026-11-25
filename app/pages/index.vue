@@ -62,6 +62,7 @@
         <span class="font-semibold text-gray-900">訂單明細</span>
         <div class="flex items-center gap-1">
           <button @click="testPrint" class="text-xs text-blue-500 hover:bg-blue-50 px-2 py-1 rounded transition-colors">🖨 測試列印</button>
+          <button @click="printCartBill" :disabled="!cart.length" class="text-xs text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🧾 帳單</button>
           <button @click="clearCart" class="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">✕ 清空</button>
         </div>
       </div>
@@ -342,6 +343,7 @@
         </div>
         <div class="flex gap-2 px-5 pb-5 no-print">
           <button @click="printReceipt" class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 font-medium transition-colors">🖨 列印收據</button>
+          <button @click="printOrderBill" class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 font-medium transition-colors">🧾 列印帳單</button>
           <button @click="finishOrder" class="flex-1 py-2.5 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold transition-colors">完成</button>
         </div>
       </div>
@@ -352,6 +354,11 @@
       <InvoicePrint ref="invoicePrintRef" :layout="printLayout" />
     </div>
 
+    <!-- 帳單網頁列印版（print-agent 連不到帳單機時用；版面在 utils/billPrint.ts），畫面上隱藏 -->
+    <div v-if="billLines" id="bill-print">
+      <BillPrint :lines="billLines" />
+    </div>
+
   </div>
 </template>
 
@@ -360,6 +367,7 @@
   import type { Product, DiscountType } from '~/composables/usePosStore'
   import { buildInvoiceLayout, buildEscPosJob } from '~/utils/invoicePrint'
   import { printViaAgent } from '~/utils/printAgent'
+  import { buildBillLines, buildBillEscPos, type BillLine, type BillOrder } from '~/utils/billPrint'
 
   const { products, discountTypes, employees, vipMembers, addOrder } = usePosStore()
 
@@ -628,6 +636,39 @@
     await printReceipt()
   }
 
+  // ---- 帳單（送帳單機 CPrinter，和發票機分開）----
+  // 先交給 print-agent 送帳單機（ESC/POS 行模式，同舊 BK35 帳單）；連不到就改用瀏覽器列印。
+  const billLines = ref<BillLine[] | null>(null)
+  async function printBill(order: BillOrder) {
+    const lines = buildBillLines(order)
+    if (await printViaAgent(buildBillEscPos(lines), 4000, 'bill')) return
+    billLines.value = lines
+    await nextTick()
+    document.body.classList.add('print-bill')
+    const done = () => { document.body.classList.remove('print-bill'); window.removeEventListener('afterprint', done) }
+    window.addEventListener('afterprint', done)
+    window.print()
+    setTimeout(done, 1000) // 舊瀏覽器沒有 afterprint 時也會還原（window.print 會等對話框關掉才往下走）
+  }
+  // 結帳前：印目前購物車的帳單給客人看（標示尚未結帳）
+  function printCartBill() {
+    if (!cart.value.length) return
+    printBill({
+      createdAt: new Date(),
+      location: curLoc.value,
+      items: cart.value.map(i => ({ ...i })),
+      subtotal: subtotal.value,
+      total: total.value,
+      discountLabel: curDiscount.value && curDiscount.value.rate < 1
+              ? `${curDiscount.value.label} ${rateLabel(curDiscount.value.rate)}` : '',
+      paid: false,
+    })
+  }
+  // 結帳後：收據視窗裡印這筆訂單的帳單（含付款方式、找零、發票號碼）
+  function printOrderBill() {
+    if (lastOrder.value) printBill({ ...lastOrder.value, paid: true })
+  }
+
   function finishOrder()  { showReceipt.value = false }
   function formatDate(d: Date) {
     return new Date(d).toLocaleString('zh-TW', {
@@ -662,5 +703,20 @@
       background: #fff;
     }
     @page { size: 57.5mm auto; margin: 0; }
+
+    /* 印帳單時改成只顯示帳單 */
+    body.print-bill #receipt-print { display: none; }
+    body.print-bill #bill-print, body.print-bill #bill-print * { visibility: visible; }
+    body.print-bill #bill-print {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 57.5mm;
+      padding: 2mm 4.75mm 6mm;
+      box-sizing: border-box;
+      background: #fff;
+    }
   }
+  #bill-print { display: none; }
 </style>

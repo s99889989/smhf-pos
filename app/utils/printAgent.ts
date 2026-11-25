@@ -9,7 +9,8 @@ export function printAgentUrl() {
 }
 
 // 成功送到印表機回傳 true；print-agent 沒開、被瀏覽器擋（混合內容）或逾時就回傳 false。
-export async function printViaAgent(ops: EscOp[], timeoutMs = 4000): Promise<boolean> {
+// target：'invoice' 送發票機（預設）、'bill' 送帳單機（print-agent.ini 的 BillPrinter，收銀電腦是 CPrinter）
+export async function printViaAgent(ops: EscOp[], timeoutMs = 4000, target: 'invoice' | 'bill' = 'invoice'): Promise<boolean> {
   const url = printAgentUrl()
   if (url === 'off') return false
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
@@ -19,7 +20,7 @@ export async function printViaAgent(ops: EscOp[], timeoutMs = 4000): Promise<boo
     const res = await fetch(`${url}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ ops }),
+      body: JSON.stringify({ ops, target }),
       signal: ctrl?.signal,
     })
     const body = await res.json().catch(() => null)

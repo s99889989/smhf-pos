@@ -88,6 +88,7 @@ function paymentLines(o: PrintOrder) {
 // ---- QR Code 內容（財政部規格，見 BK35發票完整規格.md §4）----
 // aes：AES 驗證碼 24 碼。目前發票號碼是模擬的、也還沒有金鑰，先用 0 佔位（掃描 App 會判定驗證失敗）。
 const utf8Len = (s: string) => new TextEncoder().encode(s).length
+const QR_BYTES = 170
 export function qrContents(o: PrintOrder, aes = '0'.repeat(24)) {
   const d = new Date(o.createdAt)
   const inv = o.invoiceNo.replace('-', '')
@@ -102,13 +103,10 @@ export function qrContents(o: PrintOrder, aes = '0'.repeat(24)) {
   for (; i < itemStr.length && utf8Len(left + itemStr[i]) <= 150; i++) left += itemStr[i]
   for (; i < itemStr.length && utf8Len(right + itemStr[i]) <= 110; i++) right += itemStr[i]
   const padTo = (s: string, n: number) => s + ' '.repeat(Math.max(0, n - utf8Len(s)))
-  if (utf8Len(left) < 148) left = padTo(left, 170)
-  const leftHasCjk = /[^\x00-\x7f]/.test(left)
-  const rl = utf8Len(right)
-  if (!leftHasCjk) right = padTo(right, 170)
-  else if (rl <= 2) right = padTo(right, 200)
-  else if (rl < 50) right = padTo(right, 170)
-  else if (rl < 99) right = padTo(right, 130)
+  // 左右兩個 QR 都補空白到 170 bytes（內容最多左 150、右 110）→ 位元組模式 + 糾錯 M 一律是 Version 9
+  // 53 模組 × 3 dots = 159 dots：左 36–195、右 228–387 不互撞，頂 376 → 底 535，不會壓到 row 18.7（561）的備註行
+  left = padTo(left, QR_BYTES)
+  right = padTo(right, QR_BYTES)
   return { left, right, barcode: `${rocPeriodCode(d)}${inv}${o.invoiceRandomCode}` }
 }
 
@@ -130,6 +128,8 @@ export function buildInvoiceLayout(o: PrintOrder, aes?: string): InvoiceLayout {
     { kind: 'barcode', x: 36, y: 364, height: 50, data: q.barcode },
     { kind: 'qr', x: 36, y: 376, module: 3, data: q.left },
     { kind: 'qr', x: 228, y: 376, module: 3, data: q.right },
+    // 模擬號碼時在備註行（row 18.7）標明，避免被當成正式發票
+    ...(o.invoiceIsMock ? [t(0, 561, '** 測試號碼，非正式發票 **')] : []),
     t(0, 588, `櫃:${padEnd(STORE_ID, 12)} 機:${POS_ID} 序:`),
   ]
 
@@ -155,15 +155,15 @@ export function buildInvoiceLayout(o: PrintOrder, aes?: string): InvoiceLayout {
     }
   }
   line('-'.repeat(DETAIL_COLS))
-  at(0, '小計'); at(0.4, `共${rows.length}項,$${o.total}`, true); y += LINE
+  at(0, '小計'); at(0.25, `共${rows.length}項,$${o.total}`, true); y += LINE
   line('-'.repeat(DETAIL_COLS))
   // 發票金額 / 付款方式 / 收找零 / 備註：左欄標題、右欄數值錯開半行（同紙本）
-  at(0, '發票金額'); at(0.4, `$${o.total}`, true)
+  at(0, '發票金額'); at(0.25, `$${o.total}`, true)
   at(1, '付款方式')
   const pays = paymentLines(o)
-  pays.forEach((p, i) => at(1.4 + i, p, true))
+  pays.forEach((p, i) => at(1.25 + i, p, true))
   const r = 1.5 + pays.length
-  if ((o.receivedCash ?? 0) > 0) at(r - 0.25, `收:${o.receivedCash}, 找零:${o.change ?? 0}`, true)
+  if ((o.receivedCash ?? 0) > 0) at(r - 0.45, `收:${o.receivedCash}, 找零:${o.change ?? 0}`, true)
   at(r, `備註:${o.carrier ?? ''}`)
   y += Math.round((r + 1) * LINE)
   if (o.invoiceIsMock) line('※測試號碼,未上傳財政部')
@@ -226,7 +226,9 @@ export function buildEscPosJob(layout: InvoiceLayout, opts: { cut?: boolean } = 
   }
 
   page(layout.cert)
-  raw(0x1b, 0x4a, GAP_BETWEEN) // ESC J 進紙
+  // 證明聯和明細之間切開（同舊紙本）：GS V 66 0 進紙到裁刀位置後部分裁切；不切就只進紙留撕紙空白
+  if (opts.cut !== false) raw(0x1d, 0x56, 66, 0)
+  else raw(0x1b, 0x4a, GAP_BETWEEN) // ESC J 進紙
   page(layout.detail)
   raw(0x1d, 0x21, 0, 0x1b, 0x45, 0)
   if (opts.cut !== false) raw(0x1d, 0x56, 66, 0) // GS V 66 0：進紙後裁切（沒裁刀的機型會忽略）

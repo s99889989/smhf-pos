@@ -225,16 +225,24 @@
       </div>
     </div>
 
-    <!-- VIP 驗證 Modal -->
+    <!-- VIP 選擇 Modal -->
     <div v-if="showVipModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showVipModal=false">
       <div class="bg-white rounded-2xl p-7 w-80 shadow-2xl">
-        <h3 class="text-base font-bold text-gray-900 mb-1">VIP 驗證</h3>
-        <p class="text-sm text-gray-500 mb-4">請輸入 VIP 號碼</p>
-        <input v-model="vipInput" ref="vipInputRef" type="text" placeholder="例：155375"
-               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm mb-2 focus:outline-none focus:border-purple-500">
-        <div v-if="vipInput && !vipFound" class="text-xs text-red-500 mb-3">找不到此 VIP 號碼</div>
-        <div v-if="vipFound" class="bg-purple-50 rounded-xl px-4 py-2.5 text-sm text-purple-700 mb-3 font-medium">
-          ✓ {{ vipFound.name }}
+        <h3 class="text-base font-bold text-gray-900 mb-1">選擇 VIP</h3>
+        <p class="text-sm text-gray-500 mb-4">請選擇此次消費的 VIP</p>
+        <input v-if="activeVips.length > 6" v-model="vipSearch" type="text" placeholder="篩選號碼、姓名或電話"
+               class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm mb-3 focus:outline-none focus:border-purple-500">
+        <div class="space-y-2 mb-5 max-h-52 overflow-y-auto">
+          <button v-for="v in filteredVips" :key="v.id"
+                  @click="vipInput = v.id"
+                  class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left"
+                  :class="vipInput === v.id ? 'bg-purple-50 border-purple-500' : 'border-gray-200 hover:bg-gray-50'">
+            <span class="font-mono text-xs text-gray-400">{{ v.id }}</span>
+            <span class="font-medium text-gray-900">{{ v.name }}</span>
+            <span v-if="vipInput === v.id" class="ml-auto text-purple-600">✓</span>
+          </button>
+          <div v-if="!activeVips.length" class="text-sm text-gray-400 text-center py-4">尚無啟用中的 VIP，請至會員管理新增</div>
+          <div v-else-if="!filteredVips.length" class="text-sm text-gray-400 text-center py-4">找不到符合的 VIP</div>
         </div>
         <div class="flex gap-2">
           <button @click="showVipModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
@@ -540,10 +548,16 @@
     }
   }
   const selectedStaffId  = ref('')
-  const vipInput         = ref('')
-  const vipInputRef      = ref<HTMLInputElement | null>(null)
+  const vipInput         = ref('')   // 已選取的 VIP 號碼
+  const vipSearch        = ref('')
 
   const activeEmployees = computed(() => employees.value.filter(e => e.enabled))
+  const activeVips = computed(() => vipMembers.value.filter(v => v.enabled))
+  const filteredVips = computed(() => {
+    const q = vipSearch.value.trim().toLowerCase()
+    if (!q) return activeVips.value
+    return activeVips.value.filter(v => v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q) || (v.phone ?? '').includes(q))
+  })
   const vipFound = computed(() => {
     if (!vipInput.value) return null
     return vipMembers.value.find(v => v.id === vipInput.value && v.enabled) ?? null
@@ -556,9 +570,9 @@
       selectedStaffId.value = ''
       showStaffModal.value = true
     } else if (curDiscount.value?.requireVip) {
+      vipSearch.value = ''
       vipInput.value = ''
       showVipModal.value = true
-      nextTick(() => vipInputRef.value?.focus())
     } else {
       openCarrierModal()
     }

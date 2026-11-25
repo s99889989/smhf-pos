@@ -8,6 +8,8 @@
 // 座標：x 是從印字區左邊算的 mm（印字區寬約 46mm），align=right 時 x 是右邊界。
 // 數值都是從原版照片量的（58mm 紙約 1210px → 20.9px/mm）。
 
+import { usePosStore } from '~/composables/usePosStore'
+
 export const BILL_FONT = '細明體'
 export const BILL_WIDTH = 46 // 分隔線長度（mm）
 export const LINE_FACTOR = 1.3 // 行距 = 字級 × 1.3
@@ -38,6 +40,10 @@ export interface BillOrder {
 }
 
 const LOC_NAME: Record<string, string> = { restaurant: '餐廳', shop: '小舖', stall: '擺攤' }
+// 站名：後台可自訂收銀站，先用 store 的 stationName，取不到（例如不在 Nuxt 環境）才用預設三站
+function locName(id: string) {
+  try { return usePosStore().stationName(id) || LOC_NAME[id] || id } catch { return LOC_NAME[id] ?? id }
+}
 // 單號後面括號：舊系統現金是「現收」，其他付款方式印付款名稱
 const PAY_NAME: Record<string, string> = { cash: '現收', card: '信用卡', hua: '華南Q', voucher: '消費券' }
 
@@ -77,7 +83,7 @@ export function buildBillLines(o: BillOrder): BillLine[] {
 
   // 桌次：我們沒有桌號，用地點（餐廳 / 小舖 / 擺攤）
   gap(2)
-  text(TITLE, [t(`桌次:${LOC_NAME[o.location ?? ''] ?? ''}`, 2.4)])
+  text(TITLE, [t(`桌次:${o.location ? locName(o.location) : ''}`, 2.4)])
   gap(1)
   const pay = o.paid === false ? '' : ` (${PAY_NAME[o.payMethod ?? ''] ?? o.payMethod ?? '現收'})`
   if (o.no) text(BODY, [t(`單號:${o.no}${pay}`)])

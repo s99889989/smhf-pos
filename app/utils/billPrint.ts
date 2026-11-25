@@ -5,13 +5,18 @@
 // 版面用「mm 座標 + 字級（pt）」描述，交給 print-agent（1.2 起）用 Windows GDI 畫到帳單機（CPrinter），
 // 連不到 print-agent 時由 components/BillPrint.vue 用同一份座標做網頁列印。
 //
-// 座標：x 是從印字區左邊算的 mm（印字區寬約 46mm），align=right 時 x 是右邊界。
-// 數值都是從原版照片量的（58mm 紙約 1210px → 20.9px/mm）。
+// 座標：x 是從印字區左邊算的 mm，align=right 時 x 是右邊界。
+// 位置和字級是從原版照片量的（原版印字寬 46mm），再依實際帳單紙的印字寬（BILL_WIDTH）整張等比例放大，
+// 所以寬紙上看起來就是原版放大、填滿紙寬（2026-11-26 卡爾：紙比較寬，放大置中）。
 
 import { usePosStore } from '~/composables/usePosStore'
 
 export const BILL_FONT = '細明體'
-export const BILL_WIDTH = 46 // 分隔線長度（mm）
+// 帳單機 CPrinter 是 80mm 寬紙（2026-11-25 實測照片），印字寬約 72mm；換 58mm 紙就改回 46
+export const BILL_WIDTH = 72 // 印字寬 = 分隔線長度（mm）
+const K = BILL_WIDTH / 46 // 放大倍數
+const X = (mm46: number) => Math.round(mm46 * K * 10) / 10
+const P = (pt: number) => Math.round(pt * K * 2) / 2 // 字級放大，取到 0.5pt
 export const LINE_FACTOR = 1.3 // 行距 = 字級 × 1.3
 const PT = 0.3528 // 1pt = 0.3528mm
 const STORE_NAME = '聖母健康農莊'
@@ -19,7 +24,7 @@ const STORE_NAME = '聖母健康農莊'
 export interface BillCell { text: string; x: number; align?: 'left' | 'right' | 'center' }
 export type BillLine =
   | { kind: 'text'; size: number; bold?: boolean; cells: BillCell[] }
-  | { kind: 'rule' }
+  | { kind: 'rule'; w?: number } // w：線長 mm（print-agent 舊版不認得就用 ini 的 BillWidthMm）
   | { kind: 'gap'; mm: number }
 
 export const lineHeightMm = (l: BillLine) =>
@@ -67,45 +72,46 @@ function wrap(s: string, n: number) {
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const hm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 
-// 字級（pt）：原版內文約 10pt、桌次 13pt、消費額/結帳額 11pt 粗、結尾 8pt
-const BODY = 10
-const TITLE = 13
-const AMOUNT = 11
-const FOOT = 8
-const NAME_COLS = 15 // 品名欄寬（半形格，10pt 細明體約 26mm），原版「精緻自助餐(大人」之後換行
+// 字級（pt）：原版內文約 10pt、桌次 13pt、消費額/結帳額 11pt 粗、結尾 8pt，再乘放大倍數
+const BODY = P(10)
+const TITLE = P(13)
+const AMOUNT = P(11)
+const FOOT = P(8)
+// 品名欄寬（半形格）：和原版一樣「精緻自助餐(大人」之後換行（整張等比例放大，格數不變）
+const NAME_COLS = 15
 
 export function buildBillLines(o: BillOrder): BillLine[] {
   const L: BillLine[] = []
   const text = (size: number, cells: BillCell[], bold = false) => L.push({ kind: 'text', size, bold, cells })
   const t = (s: string, x = 0, align: BillCell['align'] = 'left'): BillCell => ({ text: s, x, align })
-  const rule = () => L.push({ kind: 'rule' })
-  const gap = (mm: number) => L.push({ kind: 'gap', mm })
+  const rule = () => L.push({ kind: 'rule', w: BILL_WIDTH })
+  const gap = (mm: number) => L.push({ kind: 'gap', mm: X(mm) })
 
   // 桌次：我們沒有桌號，用地點（餐廳 / 小舖 / 擺攤）
   gap(2)
-  text(TITLE, [t(`桌次:${o.location ? locName(o.location) : ''}`, 2.4)])
+  text(TITLE, [t(`桌次:${o.location ? locName(o.location) : ''}`, X(2.4))])
   gap(1)
   const pay = o.paid === false ? '' : ` (${PAY_NAME[o.payMethod ?? ''] ?? o.payMethod ?? '現收'})`
   if (o.no) text(BODY, [t(`單號:${o.no}${pay}`)])
   text(BODY, [t(`印單:${hm(new Date())}`)])
   if (o.invoiceNo) text(BODY, [t(`發票號碼: ${o.invoiceNo.replace('-', '')}`)])
   rule()
-  text(BODY, [t('品名', 10.8), t('數量', 28), t('金額', 45, 'right')])
+  text(BODY, [t('品名', X(10.8)), t('數量', X(28)), t('金額', X(45), 'right')])
   rule()
   for (const it of o.items) {
     const parts = wrap(it.name, NAME_COLS)
-    text(BODY, [t(parts[0] ?? '', 1.2), t(String(it.qty), 32, 'right'), t(String(Math.round(it.price * it.qty)), 45, 'right')])
-    for (const p of parts.slice(1)) text(BODY, [t(p, 1.2)])
+    text(BODY, [t(parts[0] ?? '', X(1.2)), t(String(it.qty), X(32), 'right'), t(String(Math.round(it.price * it.qty)), X(45), 'right')])
+    for (const p of parts.slice(1)) text(BODY, [t(p, X(1.2))])
   }
   rule()
-  text(AMOUNT, [t('消費額:', 9.4), t(`${o.subtotal}元`, 43, 'right')], true)
+  text(AMOUNT, [t('消費額:', X(9.4)), t(`${o.subtotal}元`, X(43), 'right')], true)
   const disc = o.subtotal - o.total
-  if (disc !== 0) text(BODY, [t(`折扣額${o.discountLabel ? `(${o.discountLabel})` : ''}:`, 9.4), t(`-${disc}元`, 43, 'right')])
+  if (disc !== 0) text(BODY, [t(`折扣額${o.discountLabel ? `(${o.discountLabel})` : ''}:`, X(9.4)), t(`-${disc}元`, X(43), 'right')])
   rule()
-  text(AMOUNT, [t('結帳額:', 9.4), t(`${o.total}元`, 43, 'right')], true)
-  if (o.paid === false) text(BODY, [t('※ 尚未結帳', 9.4)])
+  text(AMOUNT, [t('結帳額:', X(9.4)), t(`${o.total}元`, X(43), 'right')], true)
+  if (o.paid === false) text(BODY, [t('※ 尚未結帳', X(9.4))])
   gap(4)
-  text(FOOT, [t(STORE_NAME, 2)])
+  text(FOOT, [t(STORE_NAME, X(2))])
   gap(2)
   return L
 }

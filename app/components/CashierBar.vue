@@ -11,16 +11,16 @@
 
   <!-- 換人視窗 -->
   <div v-if="pickerOpen" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="close">
-    <div class="bg-white rounded-2xl p-6 w-96 shadow-2xl">
+    <div class="bg-white rounded-2xl p-6 shadow-2xl flex flex-col" :style="picked ? 'width:384px; max-width:95vw;' : 'width:960px; max-width:95vw; max-height:92vh;'">
       <h3 class="text-base font-bold text-gray-900 mb-4">{{ picked ? `${picked.name}，請輸入 PIN` : '誰要結帳？' }}</h3>
 
-      <div v-if="!picked" class="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+      <div v-if="!picked" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 overflow-y-auto content-start" style="flex:1 1 auto; min-height:0;">
         <button v-for="e in candidates" :key="e.id" @click="pick(e)"
           class="py-3 px-2 rounded-xl border text-sm font-medium transition-colors"
           :class="cashier?.id === e.id ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50'">
           {{ e.name }}<span class="block text-xs text-gray-400 font-mono font-normal">{{ e.id }}</span>
         </button>
-        <p v-if="!candidates.length" class="col-span-2 text-sm text-gray-400 py-6 text-center">還沒有員工設定 PIN（員工管理 → 編輯）</p>
+        <p v-if="!candidates.length" class="col-span-full text-sm text-gray-400 py-6 text-center">還沒有員工設定 PIN（員工管理 → 編輯）</p>
       </div>
 
       <div v-else>

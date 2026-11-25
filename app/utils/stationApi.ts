@@ -27,7 +27,8 @@ export async function lanUnreachable(res: Response) {
   if (res.status !== 503) return false
   const j = await res.clone().json().catch(() => null)
   const msg = String(j?.message || j?.error || '')
-  return msg.startsWith('連不到資料機')
+  // 「einvoice.ini 還沒設定」：這台的 print-agent 不是收銀機也不是資料機（例如家裡、舊版 print-agent），一樣改走 Hub
+  return msg.startsWith('連不到資料機') || msg.includes('einvoice.ini 還沒設定')
 }
 
 /** 經家裡 Hub 打資料機。sub 例如 'einvoice/issue'、'catalog/all' */

@@ -31,18 +31,21 @@
         </button>
       </div>
 
-      <!-- Nav -->
+      <!-- Nav：參考農莊系統的圖示格狀導覽（emoji 放在圓角方塊裡、下方文字） -->
       <!-- overflow-x-hidden：避免出現橫向捲軸；收合時的名稱提示改用下面的 fixed 浮層 -->
-      <nav class="flex-1 px-2 py-2 overflow-y-auto overflow-x-hidden space-y-0.5"
+      <!-- 不用 aspect-ratio / container query：XP 的 Mypal（FF68）不支援，方塊改用固定寬高 -->
+      <nav class="flex-1 py-2 overflow-y-auto overflow-x-hidden"
+        :class="sidebarCollapsed ? 'px-1.5' : 'px-3'"
         @mousemove="onNavHover" @mouseleave="hideTip" @scroll="hideTip">
-        <template v-for="section in navSections" :key="section.label">
+        <template v-for="(section, si) in navSections" :key="section.label">
 
           <!-- sidebar 收合：分隔線 -->
-          <div v-if="sidebarCollapsed" class="border-t border-gray-100 my-1.5"></div>
+          <div v-if="sidebarCollapsed" class="border-t border-gray-100 my-2" :class="si === 0 ? 'hidden' : ''"></div>
 
           <!-- 群組標題 -->
           <button v-else @click="toggleSection(section.label)"
-            class="w-full flex items-center justify-between px-2 py-1 mt-2 rounded-lg hover:bg-gray-50 transition-colors group first:mt-0.5">
+            class="w-full flex items-center justify-between px-1 py-1 rounded-lg hover:bg-gray-50 transition-colors group"
+            :class="si === 0 ? 'mt-0.5' : 'mt-3'">
             <span class="text-xs text-gray-400 font-semibold tracking-wide">{{ section.label }}</span>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
               class="text-gray-300 group-hover:text-gray-400 transition-transform duration-150 shrink-0"
@@ -51,54 +54,18 @@
             </svg>
           </button>
 
-          <!-- 群組內容 -->
-          <template v-if="sidebarCollapsed || !collapsedSections.has(section.label)">
-            <template v-for="item in section.items" :key="item.to ?? item.subLabel">
-
-              <!-- 一般連結 -->
-              <NuxtLink v-if="!item.children" :to="item.to"
-                class="flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors group relative"
-                :class="[
-                  isActive(item.to) ? 'bg-green-50 text-green-700' : 'text-gray-600 hover:bg-gray-100',
-                  sidebarCollapsed ? 'px-2.5 py-2 justify-center' : 'pl-7 pr-2.5 py-1.5',
-                ]">
-                <span class="text-sm shrink-0" :data-tip="item.label">{{ item.icon }}</span>
-                <span v-if="!sidebarCollapsed" class="truncate text-sm">{{ item.label }}</span>
-              </NuxtLink>
-
-              <!-- 子群組 -->
-              <template v-else>
-                <!-- 子群組標題 -->
-                <button v-if="!sidebarCollapsed"
-                  @click="toggleSection(item.subLabel)"
-                  class="w-full flex items-center justify-between pl-7 pr-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors group">
-                  <div class="flex items-center gap-2.5">
-                    <span class="text-sm shrink-0">{{ item.icon }}</span>
-                    <span class="text-sm font-medium text-gray-600">{{ item.subLabel }}</span>
-                  </div>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    class="text-gray-300 group-hover:text-gray-400 transition-transform duration-150 shrink-0"
-                    :class="collapsedSections.has(item.subLabel) ? '-rotate-90' : ''">
-                    <polyline points="1.5,3 5,6.5 8.5,3"/>
-                  </svg>
-                </button>
-
-                <!-- 子群組項目 -->
-                <template v-if="sidebarCollapsed || !collapsedSections.has(item.subLabel)">
-                  <NuxtLink v-for="child in item.children" :key="child.to" :to="child.to"
-                    class="flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors group relative"
-                    :class="[
-                      isActive(child.to) ? 'bg-green-50 text-green-700' : 'text-gray-600 hover:bg-gray-100',
-                      sidebarCollapsed ? 'px-2.5 py-2 justify-center' : 'pl-12 pr-2.5 py-1.5',
-                    ]">
-                    <span class="text-xs shrink-0" :data-tip="child.label">{{ child.icon }}</span>
-                    <span v-if="!sidebarCollapsed" class="truncate text-xs">{{ child.label }}</span>
-                  </NuxtLink>
-                </template>
-              </template>
-
-            </template>
-          </template>
+          <!-- 群組內容：展開時 3 欄圖示格，收合時一排一個 -->
+          <div v-if="sidebarCollapsed || !collapsedSections.has(section.label)"
+            :class="sidebarCollapsed ? 'flex flex-col items-center gap-1.5' : 'grid grid-cols-3 gap-x-1 gap-y-3 pt-2 pb-1'">
+            <NuxtLink v-for="item in section.items" :key="item.to" :to="item.to"
+              class="nav-tile flex flex-col items-center min-w-0 text-center"
+              :class="isActive(item.to) ? 'nav-tile-active text-green-700' : 'text-gray-600'">
+              <span class="nav-tile-icon flex items-center justify-center rounded-2xl bg-gray-100 leading-none"
+                :class="sidebarCollapsed ? 'w-10 h-10 text-xl' : 'w-12 h-12 text-2xl'"
+                :data-tip="item.label">{{ item.icon }}</span>
+              <span v-if="!sidebarCollapsed" class="mt-1.5 w-full text-xs font-medium leading-tight break-words">{{ item.label }}</span>
+            </NuxtLink>
+          </div>
 
         </template>
       </nav>
@@ -154,14 +121,8 @@ const navSections = [
     items: [
       { to: '/products',  icon: '📦', label: '品項管理' },
       { to: '/materials', icon: '🌾', label: '物料庫存' },
-      {
-        subLabel: '帳號',
-        icon: '👥',
-        children: [
-          { to: '/staff',    icon: '👤', label: '員工管理' },
-          { to: '/vip',      icon: '⭐', label: 'VIP 管理' },
-        ],
-      },
+      { to: '/staff',     icon: '👤', label: '員工管理' },
+      { to: '/vip',       icon: '⭐', label: 'VIP 管理' },
     ],
   },
   {
@@ -202,3 +163,20 @@ function updateClock() {
 }
 onMounted(() => { updateClock(); setInterval(updateClock, 1000) })
 </script>
+
+<style scoped>
+/* 圖示方塊：滑過加淡框、目前頁面加綠框（用 inset box-shadow，FF68 的 outline 不會跟著圓角） */
+.nav-tile-icon {
+  transition: box-shadow 0.15s, background-color 0.15s;
+}
+.nav-tile:hover .nav-tile-icon {
+  box-shadow: inset 0 0 0 2px var(--color-green-300);
+}
+.nav-tile-active .nav-tile-icon {
+  background-color: var(--color-green-50);
+  box-shadow: inset 0 0 0 2px var(--color-green-600);
+}
+.nav-tile:active .nav-tile-icon {
+  opacity: 0.7;
+}
+</style>

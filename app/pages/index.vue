@@ -53,22 +53,28 @@
     </div>
 
     <!-- 訂單區 -->
-    <div class="w-80 border-l border-gray-200 bg-white flex flex-col shrink-0">
+    <div class="w-80 lg:w-96 border-l border-gray-200 bg-white flex flex-col shrink-0">
 
       <div class="px-4 py-3.5 border-b border-gray-200 flex justify-between items-center">
-        <span class="font-semibold text-gray-900">訂單明細</span>
+        <span class="font-semibold text-gray-900 whitespace-nowrap">訂單明細</span>
         <div class="flex items-center gap-1">
-          <button @click="testPrint" class="text-xs text-blue-500 hover:bg-blue-50 px-2 py-1 rounded transition-colors">🖨 測試列印</button>
-          <button @click="printCartBill" :disabled="!cart.length" class="text-xs text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🧾 帳單</button>
-          <button @click="clearCart" class="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">✕ 清空</button>
+          <button @click="testPrint" class="whitespace-nowrap text-xs text-blue-500 hover:bg-blue-50 px-2 py-1 rounded transition-colors">🖨 測試列印</button>
+          <button @click="printCartBill" :disabled="!cart.length" class="whitespace-nowrap text-xs text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🧾 帳單</button>
+          <button @click="clearCart" class="whitespace-nowrap text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">✕ 清空</button>
         </div>
       </div>
 
       <!-- 結帳人（換人） -->
       <CashierBar />
 
-      <!-- 折扣選擇（動態從設定讀取） -->
-      <div class="px-3 pt-3 pb-2 border-b border-gray-100">
+      <!-- 引導式結帳：第 1 步提示 -->
+      <div v-if="guided" class="px-4 py-2.5 border-b border-gray-100 bg-green-50">
+        <div class="text-xs text-green-700 font-semibold">引導式結帳　步驟 1 / {{ guidedSteps.length }}：選商品</div>
+        <div class="text-xs text-gray-500 mt-0.5">點左邊商品加入，選好後按下方「下一步」</div>
+      </div>
+
+      <!-- 折扣選擇（動態從設定讀取）；引導模式在第 2 步選 -->
+      <div v-if="!guided" class="px-3 pt-3 pb-2 border-b border-gray-100">
         <div class="text-xs text-gray-400 mb-1.5">折扣類型</div>
         <div class="flex flex-wrap gap-1.5">
           <button
@@ -124,6 +130,8 @@
           <span class="text-2xl font-bold text-gray-900">${{ total }}</span>
         </div>
 
+        <!-- 引導模式：付款在第 4 步 -->
+        <template v-if="!guided">
         <!-- 付款方式 -->
         <div class="grid grid-cols-4 gap-1.5 mb-2">
           <button
@@ -145,7 +153,7 @@
           <div class="flex items-center gap-2">
             <span class="text-xs text-amber-700 font-medium whitespace-nowrap">🎟 消費券</span>
             <input v-model.number="voucherAmount" type="number" min="0"
-                   style="flex:1; border:1px solid #f59e0b; border-radius:8px; padding:5px 10px; font-size:14px; font-weight:600; outline:none; background:#fff; color:#92400e; text-align:right;"
+                   style="flex:1; min-width:0; border:1px solid #f59e0b; border-radius:8px; padding:5px 10px; font-size:14px; font-weight:600; outline:none; background:#fff; color:#92400e; text-align:right;"
                    placeholder="0">
             <span class="text-xs text-amber-700">元</span>
           </div>
@@ -168,7 +176,7 @@
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-600 font-medium whitespace-nowrap">💵 收到現金</span>
             <input v-model.number="receivedCash" type="number" min="0"
-                   style="flex:1; border:1px solid #d1d5db; border-radius:8px; padding:5px 10px; font-size:14px; font-weight:600; outline:none; background:#fff; color:#111; text-align:right;"
+                   style="flex:1; min-width:0; border:1px solid #d1d5db; border-radius:8px; padding:5px 10px; font-size:14px; font-weight:600; outline:none; background:#fff; color:#111; text-align:right;"
                    placeholder="0">
             <span class="text-xs text-gray-500">元</span>
           </div>
@@ -189,9 +197,17 @@
           </div>
         </div>
 
+        </template>
+
         <div v-if="hasCashOnlyItem" class="text-xs text-amber-600 mb-2 text-center">⚠️ 訂單含限現金品項</div>
 
-        <button
+        <button v-if="guided"
+                @click="startGuided"
+                :disabled="!cart.length"
+                class="w-full py-3 rounded-xl font-bold text-base transition-colors"
+                :class="cart.length ? 'bg-green-700 hover:bg-green-800 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'"
+        >下一步：確認明細 ▶</button>
+        <button v-else
                 @click="startCheckout"
                 :disabled="!cart.length || voucherExceeds"
                 class="w-full py-3 rounded-xl font-bold text-base transition-colors"
@@ -200,9 +216,212 @@
       </div>
     </div>
 
+    <!-- 引導式結帳（系統設定可開關）：一步一步確認，每步都對了才能按下一步 -->
+    <div v-if="guidedOpen" class="fixed inset-0 bg-gray-100 z-40 flex flex-col">
+
+      <!-- 步驟列 -->
+      <div class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-2 overflow-x-auto shrink-0">
+        <template v-for="(label, i) in guidedSteps" :key="label">
+          <div class="flex items-center gap-1.5 whitespace-nowrap">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border"
+                  :class="i + 1 < guidedStep ? 'bg-green-700 text-white border-green-700'
+                        : i + 1 === guidedStep ? 'bg-white text-green-700 border-green-600'
+                        : 'bg-white text-gray-400 border-gray-200'">
+              {{ i + 1 < guidedStep ? '✓' : i + 1 }}
+            </span>
+            <span class="text-sm" :class="i + 1 === guidedStep ? 'text-gray-900 font-semibold' : 'text-gray-400'">{{ label }}</span>
+          </div>
+          <span v-if="i < guidedSteps.length - 1" class="text-gray-300">›</span>
+        </template>
+        <button @click="cancelGuided" class="ml-auto shrink-0 text-sm text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg">✕ 回到選商品</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        <div class="max-w-2xl mx-auto p-5">
+
+          <!-- 步驟 2：確認明細與折扣 -->
+          <template v-if="guidedStep === 2">
+            <h2 class="text-xl font-bold text-gray-900 mb-1">請和客人確認品項與數量</h2>
+            <p class="text-sm text-gray-500 mb-4">數量可在這裡改；要加別的商品請按「上一步」。</p>
+            <div class="bg-white rounded-2xl border border-gray-200 px-4 mb-4">
+              <div v-for="(item, i) in cart" :key="item.productId" class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+                <div class="flex-1 min-w-0">
+                  <div class="text-base text-gray-900 font-medium">{{ item.name }}</div>
+                  <div class="text-sm text-gray-400">單價 ${{ item.finalPrice }}</div>
+                </div>
+                <button @click="guidedQty(i, -1)" class="w-10 h-10 rounded-full border border-gray-200 text-gray-600 text-xl hover:bg-gray-100">−</button>
+                <span class="w-8 text-center text-lg font-bold">{{ item.qty }}</span>
+                <button @click="guidedQty(i, 1)" class="w-10 h-10 rounded-full border border-gray-200 text-gray-600 text-xl hover:bg-gray-100">+</button>
+                <div class="w-20 text-right text-base font-semibold text-gray-900">${{ item.finalPrice * item.qty }}</div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
+              <div class="text-sm text-gray-500 mb-2">折扣類型</div>
+              <div class="flex flex-wrap gap-2">
+                <button v-for="d in enabledDiscounts" :key="d.id" @click="guidedSetDiscount(d)"
+                        class="px-4 py-2.5 rounded-xl border text-sm font-medium"
+                        :class="curDiscount?.id === d.id ? 'bg-purple-50 text-purple-700 border-purple-400' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'">
+                  {{ d.label }}<span v-if="d.rate < 1" class="ml-1 opacity-70">{{ rateLabel(d.rate) }}</span>
+                </button>
+              </div>
+              <div v-if="curDiscount?.requireStaff" class="mt-3 flex items-center gap-3">
+                <span class="text-sm" :class="selectedStaffId ? 'text-gray-800' : 'text-red-600'">
+                  員工：{{ guidedStaffName || '尚未選擇（必選）' }}
+                </span>
+                <button @click="guidedPickStaff" class="text-sm px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">選擇員工</button>
+              </div>
+              <div v-if="curDiscount?.requireVip" class="mt-3 flex items-center gap-3">
+                <span class="text-sm" :class="vipFound ? 'text-gray-800' : 'text-red-600'">
+                  VIP：{{ vipFound ? vipFound.id + ' ' + vipFound.name : '尚未選擇（必選）' }}
+                </span>
+                <button @click="guidedPickVip" class="text-sm px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">選擇 VIP</button>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 p-4">
+              <div v-if="subtotal !== total" class="flex justify-between text-sm text-gray-400 mb-1"><span>小計</span><span>${{ subtotal }}</span></div>
+              <div v-if="subtotal !== total" class="flex justify-between text-sm text-purple-600 mb-1"><span>折扣</span><span>- ${{ subtotal - total }}</span></div>
+              <div class="flex justify-between items-baseline">
+                <span class="text-base text-gray-600">共 {{ cartCount }} 件，應收</span>
+                <span class="text-3xl font-bold text-gray-900">${{ total }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- 步驟 3：發票載具 -->
+          <template v-else-if="guidedStep === 3">
+            <h2 class="text-xl font-bold text-gray-900 mb-1">請問客人發票要存載具嗎？</h2>
+            <p class="text-sm text-gray-500 mb-4">一定要選一個才能繼續。</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <button v-for="c in carrierChoices" :key="c.value" @click="pickCarrierChoice(c.value)"
+                      class="rounded-2xl border-2 p-4 text-left bg-white"
+                      :class="carrierChoice === c.value ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'">
+                <div class="text-2xl mb-1">{{ c.icon }}</div>
+                <div class="text-base font-semibold text-gray-900">{{ c.label }}</div>
+                <div class="text-xs text-gray-500 mt-0.5">{{ c.hint }}</div>
+              </button>
+            </div>
+            <div v-if="carrierChoice === 'mobile' || carrierChoice === 'cert'" class="bg-white rounded-2xl border border-gray-200 p-4">
+              <div class="text-sm text-gray-600 mb-2">{{ carrierChoice === 'mobile' ? '掃描或輸入手機條碼（/ 開頭共 8 碼）' : '輸入自然人憑證條碼（2 個英文字 + 14 個數字）' }}</div>
+              <input v-model="carrierCode" ref="guidedCarrierInput" type="text" maxlength="16"
+                     @keydown.enter="guidedNext"
+                     :placeholder="carrierChoice === 'mobile' ? '/ABC1234' : 'AB12345678901234'"
+                     style="width:100%; border:2px solid #d1d5db; border-radius:12px; padding:10px 14px; font-size:22px; font-family:monospace; letter-spacing:2px; outline:none; background:#fff; color:#111;">
+              <div v-if="carrierCode && !carrierValid" class="text-sm text-red-600 mt-2">⚠️ 條碼格式不對，請重新掃描或檢查</div>
+              <div v-else-if="carrierValid" class="text-sm text-green-700 mt-2">✓ 條碼格式正確：{{ carrierNormalized }}</div>
+            </div>
+          </template>
+
+          <!-- 步驟 4：付款 -->
+          <template v-else-if="guidedStep === 4">
+            <h2 class="text-xl font-bold text-gray-900 mb-1">收款　應收 <span class="text-green-700">${{ total }}</span></h2>
+            <p class="text-sm text-gray-500 mb-4">選付款方式，收到錢後再按下一步。</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <button v-for="p in payMethods" :key="p.value" @click="guidedSetPay(p.value)"
+                      :disabled="hasCashOnlyItem && p.value !== 'cash' && p.value !== 'voucher'"
+                      class="rounded-2xl border-2 py-4 flex flex-col items-center gap-1 bg-white"
+                      :class="[
+                        curPay === p.value ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:border-gray-300',
+                        hasCashOnlyItem && p.value !== 'cash' && p.value !== 'voucher' ? 'opacity-40 cursor-not-allowed' : ''
+                      ]">
+                <span class="text-2xl">{{ p.icon }}</span><span class="text-base font-semibold">{{ p.label }}</span>
+              </button>
+            </div>
+            <div v-if="hasCashOnlyItem" class="text-sm text-amber-600 mb-3">⚠️ 訂單含限現金品項，只能收現金或消費券</div>
+
+            <div v-if="curPay === 'voucher'" class="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
+              <div class="flex items-center gap-3">
+                <span class="text-base text-amber-700 font-medium whitespace-nowrap">🎟 消費券面額</span>
+                <input v-model.number="voucherAmount" type="number" min="0" placeholder="0"
+                       style="flex:1; min-width:0; border:2px solid #f59e0b; border-radius:12px; padding:8px 12px; font-size:22px; font-weight:700; outline:none; background:#fff; color:#92400e; text-align:right;">
+                <span class="text-base text-amber-700">元</span>
+              </div>
+              <div v-if="voucherExceeds" class="text-sm text-red-600 mt-2">⚠️ 消費券 ${{ voucherAmount }} 超過應收 ${{ total }}，請調整</div>
+              <div v-else-if="voucherAmount > 0 && cashNeeded > 0" class="text-sm text-amber-700 mt-2">需再收現金 <b>${{ cashNeeded }}</b></div>
+              <div v-else-if="voucherAmount > 0" class="text-sm text-green-700 mt-2">✓ 消費券足額支付</div>
+            </div>
+
+            <div v-if="guidedNeedCash" class="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="text-base text-gray-700 font-medium whitespace-nowrap">💵 收到現金</span>
+                <input v-model.number="receivedCash" type="number" min="0" placeholder="0"
+                       style="flex:1; min-width:0; border:2px solid #d1d5db; border-radius:12px; padding:8px 12px; font-size:22px; font-weight:700; outline:none; background:#fff; color:#111; text-align:right;">
+                <span class="text-base text-gray-500">元</span>
+              </div>
+              <div class="flex gap-2 flex-wrap mb-3">
+                <button @click="receivedCash = guidedCashDue" class="text-base px-4 py-2 rounded-xl border border-green-500 bg-green-50 text-green-700 font-medium">剛好 ${{ guidedCashDue }}</button>
+                <button v-for="q in quickCash" :key="q" @click="receivedCash = q"
+                        class="text-base px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700">${{ q }}</button>
+              </div>
+              <div v-if="receivedCash > 0" class="flex justify-between items-center pt-3 border-t border-gray-200">
+                <span class="text-lg font-medium text-gray-600">找零</span>
+                <span class="text-3xl font-bold" :class="change >= 0 ? 'text-green-700' : 'text-red-500'">
+                  {{ change >= 0 ? '$' + change : '還差 $' + Math.abs(change) }}
+                </span>
+              </div>
+            </div>
+
+            <label v-if="curPay === 'card' || curPay === 'hua'" class="flex items-center gap-3 bg-white rounded-2xl border-2 p-4 cursor-pointer"
+                   :class="paidConfirmed ? 'border-green-600 bg-green-50' : 'border-amber-300'">
+              <input type="checkbox" v-model="paidConfirmed" style="width:24px; height:24px;">
+              <span class="text-base text-gray-800">
+                {{ curPay === 'card' ? '刷卡機已顯示授權成功' : '華南 Q 已顯示付款成功' }}，金額 ${{ total }} 正確
+              </span>
+            </label>
+          </template>
+
+          <!-- 步驟 5：最後確認 -->
+          <template v-else-if="guidedStep === 5">
+            <h2 class="text-xl font-bold text-gray-900 mb-1">最後確認</h2>
+            <p class="text-sm text-gray-500 mb-4">按下「確認結帳」就會開立發票，開了就不能改，請再看一次。</p>
+            <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+              <div class="flex justify-between px-4 py-3 text-base"><span class="text-gray-500">品項</span><span class="text-gray-900 text-right">{{ cart.map(i => i.name + '×' + i.qty).join('、') }}</span></div>
+              <div v-if="curDiscount && curDiscount.rate < 1" class="flex justify-between px-4 py-3 text-base">
+                <span class="text-gray-500">折扣</span>
+                <span class="text-purple-600">{{ curDiscount.label }} {{ rateLabel(curDiscount.rate) }}<span v-if="guidedStaffName">（{{ guidedStaffName }}）</span><span v-if="curDiscount.requireVip && vipFound">（{{ vipFound.name }}）</span></span>
+              </div>
+              <div class="flex justify-between px-4 py-3 text-base"><span class="text-gray-500">應收</span><span class="text-2xl font-bold text-gray-900">${{ total }}</span></div>
+              <div class="flex justify-between px-4 py-3 text-base"><span class="text-gray-500">付款</span><span class="text-gray-900">{{ guidedPayText }}</span></div>
+              <div v-if="guidedNeedCash" class="flex justify-between px-4 py-3 text-base">
+                <span class="text-gray-500">收現金 / 找零</span>
+                <span><span class="text-gray-900">${{ receivedCash }}</span>　<span class="text-2xl font-bold text-green-700">找 ${{ change }}</span></span>
+              </div>
+              <div class="flex justify-between px-4 py-3 text-base">
+                <span class="text-gray-500">發票</span>
+                <span class="text-gray-900">{{ carrierChoice === 'paper' ? '紙本（印證明聯給客人）' : '載具 ' + carrierNormalized }}</span>
+              </div>
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- 上一步 / 下一步 -->
+      <div class="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
+        <div class="max-w-2xl mx-auto">
+          <div v-if="guidedBlockReason" class="text-sm text-amber-600 mb-2 text-center">{{ guidedBlockReason }}</div>
+          <div class="flex gap-3">
+            <button @click="guidedBack" class="flex-1 py-4 rounded-2xl border border-gray-200 text-base text-gray-700 hover:bg-gray-50">◀ 上一步</button>
+            <button v-if="guidedStep < guidedSteps.length" @click="guidedNext" :disabled="!!guidedBlockReason"
+                    class="py-4 rounded-2xl text-lg font-bold"
+                    style="flex:2"
+                    :class="guidedBlockReason ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-700 hover:bg-green-800 text-white'">
+              下一步：{{ guidedSteps[guidedStep] }} ▶
+            </button>
+            <button v-else @click="guidedConfirm" :disabled="issuing"
+                    class="py-4 rounded-2xl text-lg font-bold bg-green-700 hover:bg-green-800 text-white disabled:opacity-60"
+                    style="flex:2">
+              {{ issuing ? '開立發票中…' : '✓ 確認結帳・開立發票' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 員工選擇 Modal -->
     <div v-if="showStaffModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showStaffModal=false">
-      <div class="bg-white rounded-2xl p-7 w-80 shadow-2xl">
+      <div class="bg-white rounded-2xl p-7 shadow-2xl flex flex-col" style="width:960px; max-width:95vw; max-height:92vh;">
         <h3 class="text-base font-bold text-gray-900 mb-1">選擇員工</h3>
         <p class="text-sm text-gray-500 mb-4">請選擇此次消費的員工</p>
         <template v-if="activeEmployees.length > 6">
@@ -214,7 +433,7 @@
             <option v-for="d in staffDepts" :key="d" :value="d">{{ d }}</option>
           </select>
         </template>
-        <div class="space-y-2 mb-5 max-h-52 overflow-y-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-5 overflow-y-auto content-start" style="flex:1 1 auto; min-height:0;">
           <button v-for="emp in filteredStaff" :key="emp.id"
                   @click="selectedStaffId = emp.id"
                   class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left"
@@ -224,7 +443,7 @@
             <span v-if="emp.dept" class="text-xs text-gray-400 truncate">{{ emp.dept }}</span>
             <span v-if="selectedStaffId === emp.id" class="ml-auto text-green-600">✓</span>
           </button>
-          <div v-if="!filteredStaff.length" class="text-sm text-gray-400 text-center py-4">找不到符合的員工</div>
+          <div v-if="!filteredStaff.length" class="col-span-full text-sm text-gray-400 text-center py-4">找不到符合的員工</div>
         </div>
         <div class="flex gap-2">
           <button @click="showStaffModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
@@ -239,12 +458,12 @@
 
     <!-- VIP 選擇 Modal -->
     <div v-if="showVipModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showVipModal=false">
-      <div class="bg-white rounded-2xl p-7 w-80 shadow-2xl">
+      <div class="bg-white rounded-2xl p-7 shadow-2xl flex flex-col" style="width:960px; max-width:95vw; max-height:92vh;">
         <h3 class="text-base font-bold text-gray-900 mb-1">選擇 VIP</h3>
         <p class="text-sm text-gray-500 mb-4">請選擇此次消費的 VIP</p>
         <input v-if="activeVips.length > 6" v-model="vipSearch" type="text" placeholder="篩選號碼、姓名或電話"
                class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm mb-3 focus:outline-none focus:border-purple-500">
-        <div class="space-y-2 mb-5 max-h-52 overflow-y-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-5 overflow-y-auto content-start" style="flex:1 1 auto; min-height:0;">
           <button v-for="v in filteredVips" :key="v.id"
                   @click="vipInput = v.id"
                   class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left"
@@ -253,8 +472,8 @@
             <span class="font-medium text-gray-900">{{ v.name }}</span>
             <span v-if="vipInput === v.id" class="ml-auto text-purple-600">✓</span>
           </button>
-          <div v-if="!activeVips.length" class="text-sm text-gray-400 text-center py-4">尚無啟用中的 VIP，請至會員管理新增</div>
-          <div v-else-if="!filteredVips.length" class="text-sm text-gray-400 text-center py-4">找不到符合的 VIP</div>
+          <div v-if="!activeVips.length" class="col-span-full text-sm text-gray-400 text-center py-4">尚無啟用中的 VIP，請至會員管理新增</div>
+          <div v-else-if="!filteredVips.length" class="col-span-full text-sm text-gray-400 text-center py-4">找不到符合的 VIP</div>
         </div>
         <div class="flex gap-2">
           <button @click="showVipModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
@@ -291,14 +510,16 @@
 
     <!-- 收據 Modal -->
     <div v-if="showReceipt && lastOrder" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-      <div class="bg-white rounded-2xl w-80 max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div class="bg-white rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl" style="width:760px; max-width:95vw;">
         <div class="p-7">
           <div class="text-center mb-4">
-            <div class="text-green-700 font-bold text-lg">聖母健康農莊</div>
-            <div class="text-gray-400 text-xs mt-0.5">St. Mary's Health Farm, Taitung</div>
+            <div class="text-green-700 font-bold text-xl">聖母健康農莊</div>
+            <div class="text-gray-400 text-sm mt-0.5">St. Mary's Health Farm, Taitung</div>
           </div>
           <hr class="border-dashed border-gray-200 my-4">
-          <div class="text-xs text-gray-500 space-y-1 mb-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+          <div>
+          <div class="text-sm text-gray-500 space-y-1 mb-3">
             <div class="flex justify-between"><span>單號</span><span class="text-gray-800 font-medium">{{ lastOrder.no }}</span></div>
             <div v-if="lastOrder.invoiceNo" class="flex justify-between">
               <span>發票號碼<span v-if="lastOrder.invoiceIsMock" class="text-amber-500 ml-1">(測試)</span></span>
@@ -312,7 +533,7 @@
             </div>
           </div>
           <hr class="border-dashed border-gray-200 my-3">
-          <table class="w-full text-xs mb-2">
+          <table class="w-full text-sm mb-2">
             <thead>
             <tr class="text-gray-400 border-b border-gray-200">
               <th class="text-left pb-1.5 font-medium">品項</th>
@@ -328,38 +549,42 @@
             </tr>
             </tbody>
           </table>
-          <hr class="border-dashed border-gray-200 my-3">
-          <div v-if="lastOrder.subtotal !== lastOrder.total">
-            <div class="flex justify-between text-xs text-gray-400 mb-1"><span>小計</span><span>${{ lastOrder.subtotal }}</span></div>
-            <div class="flex justify-between text-xs text-purple-600 mb-1"><span>折扣</span><span>- ${{ lastOrder.subtotal - lastOrder.total }}</span></div>
           </div>
-          <div class="flex justify-between text-base font-bold text-gray-900 border-t border-gray-200 pt-2">
+          <div>
+          <hr class="border-dashed border-gray-200 my-3 md:hidden">
+          <div v-if="lastOrder.subtotal !== lastOrder.total">
+            <div class="flex justify-between text-sm text-gray-400 mb-1"><span>小計</span><span>${{ lastOrder.subtotal }}</span></div>
+            <div class="flex justify-between text-sm text-purple-600 mb-1"><span>折扣</span><span>- ${{ lastOrder.subtotal - lastOrder.total }}</span></div>
+          </div>
+          <div class="flex justify-between text-2xl font-bold text-gray-900 border-t border-gray-200 pt-2">
             <span>合計</span><span>${{ lastOrder.total }}</span>
           </div>
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <div class="flex justify-between text-sm text-gray-400 mt-1">
             <span>付款方式</span>
             <span>{{ lastOrder.payDetail || PAY_LABEL[lastOrder.payMethod] }}</span>
           </div>
-          <div v-if="lastOrder.receivedCash > 0" class="flex justify-between text-xs text-gray-400 mt-1">
+          <div v-if="lastOrder.receivedCash > 0" class="flex justify-between text-sm text-gray-400 mt-1">
             <span>收到現金</span><span>${{ lastOrder.receivedCash }}</span>
           </div>
-          <div v-if="lastOrder.receivedCash > 0" class="flex justify-between text-sm font-bold text-green-700 mt-1">
+          <div v-if="lastOrder.receivedCash > 0" class="flex justify-between text-2xl font-bold text-green-700 mt-1">
             <span>找零</span><span>${{ lastOrder.change }}</span>
           </div>
           <div class="mt-4 rounded-xl p-3" :class="lastOrder.carrier ? 'bg-green-50' : 'bg-amber-50'">
-            <div class="text-xs font-semibold mb-1" :class="lastOrder.carrier ? 'text-green-700' : 'text-amber-700'">
+            <div class="text-sm font-semibold mb-1" :class="lastOrder.carrier ? 'text-green-700' : 'text-amber-700'">
               {{ lastOrder.carrier ? '📱 載具歸戶' : '🧾 紙本二聯式發票' }}
             </div>
-            <div class="text-sm font-medium" :class="lastOrder.carrier ? 'text-green-800' : 'text-amber-800'">
+            <div class="text-base font-medium" :class="lastOrder.carrier ? 'text-green-800' : 'text-amber-800'">
               {{ lastOrder.carrier || '請至發票機取件' }}
             </div>
           </div>
-          <div class="text-center text-xs text-gray-400 mt-5 leading-6">感謝您的惠顧<br>歡迎再次蒞臨</div>
+          </div>
+          </div>
+          <div class="text-center text-sm text-gray-400 mt-5 leading-6">感謝您的惠顧<br>歡迎再次蒞臨</div>
         </div>
-        <div class="flex gap-2 px-5 pb-5 no-print">
-          <button @click="printReceipt" class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 font-medium transition-colors">🖨 列印收據</button>
-          <button @click="printOrderBill" class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 font-medium transition-colors">🧾 列印帳單</button>
-          <button @click="finishOrder" class="flex-1 py-2.5 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold transition-colors">完成</button>
+        <div class="flex gap-2 px-7 pb-6 no-print">
+          <button @click="printReceipt" class="flex-1 whitespace-nowrap py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-base text-gray-700 font-medium transition-colors">🖨 列印發票</button>
+          <button @click="printOrderBill" class="flex-1 whitespace-nowrap py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-base text-gray-700 font-medium transition-colors">🧾 列印帳單</button>
+          <button @click="finishOrder" class="flex-1 whitespace-nowrap py-3 rounded-xl bg-green-700 hover:bg-green-800 text-white text-base font-semibold transition-colors">完成</button>
         </div>
       </div>
     </div>
@@ -385,6 +610,7 @@
   import { printViaAgent, printBillViaAgent } from '~/utils/printAgent'
   import { issueEInvoice, formatInvoiceNo } from '~/utils/einvoiceApi'
   import { buildBillLines, type BillLine, type BillOrder } from '~/utils/billPrint'
+  import { useGuidedCheckout, loadGuidedCheckout } from '~/composables/useGuidedCheckout'
 
   const { products, discountTypes, employees, vipMembers, addOrder, stationName } = usePosStore()
 
@@ -496,13 +722,13 @@
   function confirmStaff() {
     if (!selectedStaffId.value) return
     showStaffModal.value = false
-    openCarrierModal()
+    if (!guidedOpen.value) openCarrierModal() // 引導模式：選完回到第 2 步
   }
 
   function confirmVip() {
     if (!vipFound.value) return
     showVipModal.value = false
-    openCarrierModal()
+    if (!guidedOpen.value) openCarrierModal()
   }
 
   // 本機收銀站：設了就鎖定（地點切換鈕隱藏），只顯示該站商品
@@ -634,6 +860,7 @@
       order.invoiceNo = formatInvoiceNo(r.data.invoiceNo)
       order.invoiceRandomCode = r.data.randomCode
       order.invoiceAes = r.data.aes
+      order.invoiceIsMock = !!r.data.mock // 模擬加值中心開的：紙本印「測試號碼」
       issuedAt = new Date(r.data.issuedAt)
     } else if (r.notConfigured) {
       console.warn('未啟用電子發票，改用測試號碼：', r.message)
@@ -729,6 +956,140 @@
   function printOrderBill() {
     if (lastOrder.value) printBill({ ...lastOrder.value, paid: true })
   }
+
+  // ---- 引導式結帳（系統設定開關，每台機器自己記）----
+  // 1 選商品（就是原本的收銀畫面）→ 2 確認明細/折扣 → 3 發票載具 → 4 付款 → 5 最後確認 → 開票後跳出收據 = 完成
+  // 每一步都要符合條件才能按下一步；開票仍走原本的 confirmCheckout()，資料格式和一般模式完全相同。
+  const guided = useGuidedCheckout()
+  onMounted(loadGuidedCheckout)
+  const guidedSteps = ['選商品', '確認明細', '發票載具', '付款', '確認結帳']
+  const guidedStep  = ref(1)
+  const guidedOpen  = computed(() => guided.value && guidedStep.value >= 2)
+
+  const carrierChoices = [
+    { value: 'paper',  icon: '🧾', label: '不用載具', hint: '印紙本證明聯給客人' },
+    { value: 'mobile', icon: '📱', label: '手機條碼', hint: '/ 開頭 8 碼' },
+    { value: 'cert',   icon: '🪪', label: '自然人憑證', hint: '2 英文 + 14 數字' },
+  ] as const
+  const carrierChoice = ref<'' | 'paper' | 'mobile' | 'cert'>('')
+  const carrierCode   = ref('')
+  const guidedCarrierInput = ref<HTMLInputElement | null>(null)
+  const carrierNormalized = computed(() => carrierCode.value.replace(/\s/g, '').toUpperCase())
+  const carrierValid = computed(() => {
+    if (carrierChoice.value === 'mobile') return /^\/[0-9A-Z.+-]{7}$/.test(carrierNormalized.value)
+    if (carrierChoice.value === 'cert')   return /^[A-Z]{2}[0-9]{14}$/.test(carrierNormalized.value)
+    return carrierChoice.value === 'paper'
+  })
+  function pickCarrierChoice(v: '' | 'paper' | 'mobile' | 'cert') {
+    if (carrierChoice.value !== v) carrierCode.value = ''
+    carrierChoice.value = v
+    if (v !== 'paper') nextTick(() => { if (guidedCarrierInput.value) guidedCarrierInput.value.focus() })
+  }
+
+  const paidConfirmed = ref(false)
+  watch([total, curPay], () => { paidConfirmed.value = false })
+
+  const cartCount = computed(() => cart.value.reduce((s, i) => s + i.qty, 0))
+  const guidedStaffName = computed(() => {
+    if (!curDiscount.value || !curDiscount.value.requireStaff || !selectedStaffId.value) return ''
+    const e = employees.value.find(x => x.id === selectedStaffId.value)
+    return e ? e.id + ' ' + e.name : selectedStaffId.value
+  })
+  // 要收的現金：純現金 = 應收；消費券 = 差額
+  const guidedNeedCash = computed(() =>
+          curPay.value === 'cash' || (curPay.value === 'voucher' && voucherAmount.value > 0 && !voucherExceeds.value && cashNeeded.value > 0)
+  )
+  const guidedCashDue = computed(() => curPay.value === 'voucher' ? cashNeeded.value : total.value)
+  const guidedPayText = computed(() => {
+    if (curPay.value === 'voucher') {
+      return cashNeeded.value > 0 ? `消費券 $${voucherAmount.value} + 現金 $${cashNeeded.value}` : `消費券 $${voucherAmount.value}`
+    }
+    return PAY_LABEL[curPay.value] || curPay.value
+  })
+
+  // 這一步還不能往下走的原因（空字串 = 可以下一步）
+  const guidedBlockReason = computed(() => {
+    const s = guidedStep.value
+    if (s >= 2) {
+      if (!cart.value.length) return '還沒有任何品項'
+      if (curDiscount.value && curDiscount.value.requireStaff && !selectedStaffId.value) return '這個折扣要先選擇員工'
+      if (curDiscount.value && curDiscount.value.requireVip && !vipFound.value) return '這個折扣要先選擇 VIP'
+    }
+    if (s === 2) return ''
+    if (s >= 3) {
+      if (!carrierChoice.value) return '請選擇發票要不要存載具'
+      if (!carrierValid.value) return carrierCode.value ? '載具條碼格式不對' : '請掃描或輸入載具條碼'
+    }
+    if (s === 3) return ''
+    if (hasCashOnlyItem.value && curPay.value !== 'cash' && curPay.value !== 'voucher') return '含限現金品項，請改收現金'
+    if (curPay.value === 'voucher') {
+      if (!(voucherAmount.value > 0)) return '請輸入消費券面額'
+      if (voucherExceeds.value) return '消費券面額超過應收金額'
+    }
+    if (guidedNeedCash.value) {
+      if (!(receivedCash.value > 0)) return '請輸入收到的現金'
+      if (change.value < 0) return `現金還差 $${Math.abs(change.value)}`
+    }
+    if ((curPay.value === 'card' || curPay.value === 'hua') && !paidConfirmed.value) return '請確認付款成功後打勾'
+    return ''
+  })
+
+  function startGuided() {
+    if (!cart.value.length) return
+    if (!ensureCashier()) return // 要先選結帳人
+    selectedStaffId.value = ''
+    staffSearch.value = ''
+    staffDept.value = ''
+    vipInput.value = ''
+    vipSearch.value = ''
+    carrierChoice.value = ''
+    carrierCode.value = ''
+    paidConfirmed.value = false
+    voucherAmount.value = 0
+    receivedCash.value = 0
+    if (hasCashOnlyItem.value && curPay.value !== 'cash' && curPay.value !== 'voucher') curPay.value = 'cash'
+    guidedStep.value = 2
+  }
+  function cancelGuided() { guidedStep.value = 1 } // 購物車保留，回去加減商品
+  function guidedBack() { guidedStep.value = guidedStep.value - 1 }
+  function guidedNext() {
+    if (guidedBlockReason.value || guidedStep.value >= guidedSteps.length) return
+    guidedStep.value = guidedStep.value + 1
+  }
+  function guidedQty(i: number, d: number) {
+    changeQty(i, d)
+    if (!cart.value.length) guidedStep.value = 1
+  }
+  function guidedSetDiscount(d: DiscountType) {
+    if (curDiscount.value && curDiscount.value.id === d.id) return
+    setDiscount(d)
+    selectedStaffId.value = ''
+    vipInput.value = ''
+    if (d.requireStaff) guidedPickStaff()
+    else if (d.requireVip) guidedPickVip()
+  }
+  function guidedPickStaff() {
+    staffSearch.value = ''
+    staffDept.value = ''
+    showStaffModal.value = true
+  }
+  function guidedPickVip() {
+    vipSearch.value = ''
+    showVipModal.value = true
+  }
+  function guidedSetPay(p: 'cash' | 'card' | 'hua' | 'voucher') {
+    setPay(p)
+    paidConfirmed.value = false
+  }
+  async function guidedConfirm() {
+    if (guidedBlockReason.value || issuing.value) return
+    carrier.value = carrierChoice.value === 'paper' ? '' : carrierNormalized.value
+    await confirmCheckout()
+    // 成功會清空購物車並跳出收據；失敗（已 alert）就停在這一步
+    if (!cart.value.length) guidedStep.value = 1
+  }
+  // 關掉引導模式時順便收起畫面
+  watch(guided, (v) => { if (!v) guidedStep.value = 1 })
 
   function finishOrder()  { showReceipt.value = false }
   function formatDate(d: Date) {

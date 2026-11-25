@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
         },
         bodyBase64: body ? Buffer.from(body).toString('base64') : undefined,
       }),
-      signal: AbortSignal.timeout(path.startsWith('einvoice/run') ? 145000 : 30000),
+      signal: AbortSignal.timeout(path.startsWith('einvoice/run') || path.startsWith('einvoice/query') ? 145000 : 30000),
     })
   } catch (e) {
     throw createError({ statusCode: 502, statusMessage: `連不到家裡 Hub：${(e as Error).message}` })

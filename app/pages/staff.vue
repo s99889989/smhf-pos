@@ -139,7 +139,7 @@
             <div class="rounded-xl bg-gray-50 py-2"><div class="text-lg font-bold text-gray-600">{{ plan.same }}</div><div class="text-xs text-gray-500">不變</div></div>
           </div>
           <p class="text-xs text-gray-500">檔案共 {{ plan.rows }} 人、{{ plan.depts }} 個部門<span v-if="plan.skipped">；{{ plan.skipped }} 列沒有編號或姓名，略過</span><span v-if="plan.dupes">；{{ plan.dupes }} 個編號重複，用最後一列</span>。</p>
-          <ul v-if="plan.updated.length" class="max-h-28 overflow-y-auto text-xs text-gray-600 border border-gray-100 rounded-lg p-2 space-y-0.5">
+          <ul v-if="plan.updated.length" class="max-h-60 overflow-y-auto text-xs text-gray-600 border border-gray-100 rounded-lg p-2 space-y-0.5">
             <li v-for="u in plan.updated.slice(0, 50)" :key="u.id">{{ u.id }} {{ u.from }} → {{ u.to }}</li>
             <li v-if="plan.updated.length > 50" class="text-gray-400">…還有 {{ plan.updated.length - 50 }} 筆</li>
           </ul>

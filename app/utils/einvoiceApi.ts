@@ -8,6 +8,8 @@ import { printAgentUrl } from './printAgent'
 import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 const ENABLED_KEY = 'pos-einvoice-enabled'
+// 只有「開立 / 作廢」要這台有啟用；查看（清單、狀態、查詢）任何連得到資料機的電腦都可以（例如家裡經 Hub）
+const READ_ONLY = new Set(['status', 'list', 'query'])
 
 export function einvoiceEnabled() {
   try { return localStorage.getItem(ENABLED_KEY) === '1' } catch { return false }
@@ -22,6 +24,7 @@ export interface IssuedInvoice {
   randomCode: string
   aes: string
   term: string
+  mock?: boolean // 資料機設 Endpoint=mock（模擬加值中心）開的測試發票
 }
 
 export type ApiResult<T> =
@@ -29,7 +32,7 @@ export type ApiResult<T> =
   | { ok: false; notConfigured: boolean; message: string }
 
 async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown, timeoutMs = 25000): Promise<ApiResult<T>> {
-  if (!einvoiceEnabled()) return { ok: false, notConfigured: true, message: '這台收銀機沒有啟用電子發票' }
+  if (!einvoiceEnabled() && !READ_ONLY.has(path)) return { ok: false, notConfigured: true, message: '這台收銀機沒有啟用電子發票' }
   const base = printAgentUrl()
   const init = (): RequestInit => ({
     method,
@@ -103,6 +106,8 @@ export interface InvoiceRecord {
   uploadAttempts: number
   uploadMsg: string
   uploadedAt: string
+  queryResult?: string // 向加值中心查詢狀態（QueryInvoiceStatus）的回覆原文；沒查過是空的
+  queryAt?: string
   cancelStatus: 'pending' | 'done' | 'needApproval' | null
   cancelMsg: string
 }
@@ -110,6 +115,12 @@ export interface InvoiceRecord {
 export const listEInvoices = (from: string, to: string) =>
   call<{ from: string; to: string; invoices: InvoiceRecord[]; truncated: boolean }>('POST', 'list', { from, to }, 40000)
 export const runEInvoiceQueue = () => call<any>('POST', 'run', {}, 120000)
+/** 向加值中心查一張發票的狀態 */
+export const queryEInvoice = (invoiceNo: string) =>
+  call<{ invoiceNo: string; queryResult: string; queryAt: string }>('POST', 'query', { invoiceNo: invoiceNo.replace('-', '') }, 40000)
+/** 向加值中心查 from～to 已上傳的發票（一次最多 100 張，資料機每天也會自動查前一天的） */
+export const queryEInvoiceRange = (from: string, to: string) =>
+  call<{ queried: number; failed: number; total: number; lastError: string }>('POST', 'query', { from, to }, 120000)
 
 /** BM92177850 → BM-92177850（列印用） */
 export const formatInvoiceNo = (no: string) => `${no.slice(0, 2)}-${no.slice(2)}`

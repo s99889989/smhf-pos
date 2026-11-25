@@ -28,6 +28,25 @@
         </div>
       </div>
 
+      <!-- 引導式結帳 -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-800">引導式結帳（防呆）</h2>
+            <p class="text-xs text-gray-400 mt-0.5">像點餐機一步一步：選商品 → 確認明細 → 發票載具 → 付款找零 → 最後確認，每步都對了才能下一步。只存在這台機器。</p>
+          </div>
+          <button @click="writeGuidedCheckout(!guided)"
+            class="shrink-0 w-10 h-6 rounded-full transition-colors relative"
+            :class="guided ? 'bg-green-500' : 'bg-gray-200'" :title="guided ? '已開啟' : '已關閉'">
+            <span class="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all"
+              :class="guided ? 'left-5' : 'left-1'"></span>
+          </button>
+        </div>
+        <div class="px-5 py-3 text-xs" :class="guided ? 'text-green-700' : 'text-gray-500'">
+          {{ guided ? '已開啟：收銀頁按「下一步」進入引導結帳' : '已關閉：收銀頁維持原本一頁結帳' }}
+        </div>
+      </div>
+
       <!-- 站別與資料機 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -247,6 +266,11 @@ const { discountTypes } = usePosStore()
 import { writeStation, loadStation } from '~/composables/useStation'
 const station = useStation()
 onMounted(loadStation)
+
+// ---- 引導式結帳（每台機器自己記）----
+import { useGuidedCheckout, loadGuidedCheckout, writeGuidedCheckout } from '~/composables/useGuidedCheckout'
+const guided = useGuidedCheckout()
+onMounted(loadGuidedCheckout)
 
 // ---- 站別（存資料機）----
 const { stations } = usePosStore()

@@ -85,7 +85,7 @@
         <!-- 結帳人 -->
         <div v-if="cashierStats.length" class="bg-white rounded-xl border border-gray-200 p-5">
           <h2 class="text-sm font-semibold text-gray-700 mb-4">結帳人</h2>
-          <div class="space-y-3 max-h-56 overflow-y-auto">
+          <div class="space-y-3 max-h-96 overflow-y-auto">
             <div v-for="c in cashierStats" :key="c.key">
               <div class="flex justify-between text-sm mb-1">
                 <span class="text-gray-600">{{ c.label }}</span>
@@ -110,6 +110,10 @@
             <button class="text-green-700 hover:underline" :disabled="invLoading" @click="refreshAll">
               {{ invLoading ? '讀取中…' : '重新整理' }}
             </button>
+            <button v-if="invoices.length" class="text-blue-600 hover:underline" :disabled="querying" @click="queryRange"
+              title="向加值中心查這段期間已上傳發票的狀態（資料機每天也會自動查前一天的）">
+              {{ querying ? '查詢中…' : '向加值中心查詢' }}
+            </button>
           </div>
         </div>
         <div v-if="invError" class="px-5 py-4 text-sm text-amber-600">{{ invError }}</div>
@@ -124,7 +128,7 @@
           <div v-if="!shownInvoices.length" class="py-10 text-center text-gray-300 text-sm">
             {{ invLoading ? '讀取中…' : invProblemsOnly ? '沒有待處理的發票' : (mode === 'daily' ? '此日' : '此月') + '沒有開立發票' }}
           </div>
-          <div v-else class="max-h-96 overflow-y-auto">
+          <div v-else class="overflow-y-auto" style="max-height:70vh;">
             <table class="w-full text-sm">
               <thead class="sticky top-0">
                 <tr class="text-xs text-gray-400 border-b border-gray-200 bg-gray-50">
@@ -133,6 +137,7 @@
                   <th class="text-left px-3 py-2.5 font-medium">收銀機</th>
                   <th class="text-left px-3 py-2.5 font-medium">狀態</th>
                   <th class="text-left px-3 py-2.5 font-medium">訊息</th>
+                  <th class="text-left px-3 py-2.5 font-medium">加值中心查詢</th>
                   <th class="text-right px-5 py-2.5 font-medium">金額</th>
                 </tr>
               </thead>
@@ -145,6 +150,12 @@
                     <span class="px-1.5 py-0.5 rounded" :class="invState(inv).cls">{{ invState(inv).label }}</span>
                   </td>
                   <td class="px-3 py-2.5 text-gray-400 text-xs max-w-[220px] truncate" :title="invState(inv).msg">{{ invState(inv).msg }}</td>
+                  <td class="px-3 py-2.5 text-xs max-w-[200px]">
+                    <div v-if="inv.queryResult" class="truncate text-gray-600" :title="`${inv.queryResult}（${inv.queryAt}）`">{{ inv.queryResult }}</div>
+                    <button v-if="inv.uploadStatus === 'done' && !inv.fromTablet" class="text-blue-600 hover:underline" :disabled="queryingNo === inv.invoiceNo" @click="queryOne(inv)">
+                      {{ queryingNo === inv.invoiceNo ? '查詢中…' : inv.queryResult ? '重查' : '查詢' }}
+                    </button>
+                  </td>
                   <td class="px-5 py-2.5 text-right font-medium" :class="inv.cancelStatus === 'done' ? 'text-gray-300 line-through' : 'text-gray-900'">${{ Number(inv.total).toLocaleString() }}</td>
                 </tr>
               </tbody>
@@ -223,7 +234,7 @@
 
 <script setup lang="ts">
 import { LOC_LABEL, PAY_LABEL, type Order } from '~/composables/usePosStore'
-import { listEInvoices, formatInvoiceNo, type InvoiceRecord } from '~/utils/einvoiceApi'
+import { listEInvoices, formatInvoiceNo, queryEInvoice, queryEInvoiceRange, type InvoiceRecord } from '~/utils/einvoiceApi'
 import { listOrders, pendingOrders } from '~/utils/ordersApi'
 
 const { orders, stations, stationName } = usePosStore()
@@ -393,6 +404,27 @@ async function loadInvoices() {
   }
 }
 watch(invRange, refreshAll, { immediate: true })
+
+// 向加值中心查詢狀態（QueryInvoiceStatus）：回覆格式沒有公開文件，先直接顯示原文
+const querying = ref(false)
+const queryingNo = ref('')
+async function queryOne(inv: InvoiceRecord) {
+  queryingNo.value = inv.invoiceNo
+  const r = await queryEInvoice(inv.invoiceNo)
+  queryingNo.value = ''
+  if (r.ok) { inv.queryResult = r.data.queryResult; inv.queryAt = r.data.queryAt }
+  else alert('查詢失敗：' + r.message)
+}
+async function queryRange() {
+  querying.value = true
+  const { from, to } = invRange.value
+  const r = await queryEInvoiceRange(from, to)
+  querying.value = false
+  if (!r.ok) { alert('查詢失敗：' + r.message); return }
+  if (r.data.failed) alert(`查了 ${r.data.queried} 張，失敗 ${r.data.failed} 張：${r.data.lastError}`)
+  else if (r.data.total > r.data.queried) alert(`這次查了 ${r.data.queried} 張（共 ${r.data.total} 張），再按一次查剩下的`)
+  void loadInvoices()
+}
 
 function invState(inv: InvoiceRecord) {
   if (inv.cancelStatus === 'done') return { label: '已作廢', cls: 'bg-gray-100 text-gray-500', msg: inv.cancelMsg }

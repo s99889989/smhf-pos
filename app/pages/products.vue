@@ -158,7 +158,7 @@
               <div v-for="(pm, i) in form.materials" :key="i" class="flex gap-2 items-center">
                 <select
                   v-model.number="pm.materialId"
-                  style="flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; background:#fff; color:#111; outline:none;"
+                  style="flex:1; min-width:0; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; background:#fff; color:#111; outline:none;"
                 >
                   <option :value="0" disabled>請選擇物料</option>
                   <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.unit }}）</option>

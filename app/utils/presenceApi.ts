@@ -157,12 +157,17 @@ export interface HubCheck {
   dataMachine: HopState // 資料機 print-agent（127.0.0.1:17891）
   noToken: boolean
   message: string
+  hint: string // 白話：要去哪裡檢查
   ms: number
   list: PresenceList | null
 }
 
+const HINT_HUB = '請檢查家裡：Hub 主機（ysa-server）有沒有開機、Spring Boot 有沒有在跑；家裡網路、路由器有沒有斷線；手機用 4G 開 https://madustrialtd.asuscomm.com:8080 看得到東西就代表家裡對外是通的。'
+
+const HINT_POS = '家裡 Hub 有在跑，卡在公司資料機這段。請到資料機：pos-agent 資料夾點「檢查狀態.bat」，不是 1 支就點「重新啟動.bat」；log 有 Read timed out 就是資料機的 print-agent 卡住，要重開 print-agent。'
+
 export async function checkHub(): Promise<HubCheck> {
-  const r: HubCheck = { netlify: 'unknown', hub: 'unknown', posAgent: 'unknown', dataMachine: 'unknown', noToken: false, message: '', ms: 0, list: null }
+  const r: HubCheck = { netlify: 'unknown', hub: 'unknown', posAgent: 'unknown', dataMachine: 'unknown', noToken: false, message: '', hint: '', ms: 0, list: null }
   if (!stationToken()) { r.noToken = true; r.message = '這台沒有設定收銀機密碼（系統設定 → 電子發票），不能走家裡 Hub'; return r }
   const t0 = Date.now()
   let res: Response
@@ -170,7 +175,16 @@ export async function checkHub(): Promise<HubCheck> {
     res = await withTimeout(signal => hubFetch('presence/list', { signal }), 35000)
   } catch (e) {
     r.ms = Date.now() - t0
-    r.netlify = 'fail'; r.message = `連不到網站伺服器（${(e as Error).message}）`
+    const name = (e as Error)?.name
+    if (name === 'AbortError' || name === 'TimeoutError') {
+      // 網站伺服器等家裡 Hub 最多 20 秒就會回答；35 秒都沒回，多半是網站伺服器在等家裡 Hub 時被卡住
+      r.message = `等了 ${Math.round(r.ms / 1000)} 秒都沒有回應：網站伺服器一直在等家裡 Hub 和資料機的 pos-agent`
+      r.hint = HINT_POS
+    } else if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      r.netlify = 'fail'; r.message = '這台電腦現在沒有網路'
+    } else {
+      r.netlify = 'fail'; r.message = '連不到網站伺服器（這台的網路有問題，或網站暫時掛了）'
+    }
     return r
   }
   r.ms = Date.now() - t0
@@ -181,10 +195,20 @@ export async function checkHub(): Promise<HubCheck> {
     r.netlify = r.hub = r.posAgent = r.dataMachine = 'ok'; r.list = j as PresenceList; return r
   }
   r.message = msg
-  if (!j) { r.netlify = 'fail'; return r }
+  if (!j) {
+    // 不是 JSON：Netlify 自己的錯誤頁
+    if (res.status === 502 || res.status === 504) {
+      r.hub = 'fail'; r.hint = HINT_HUB
+      r.message = `網站伺服器等家裡 Hub 等太久被切斷（HTTP ${res.status}），家裡 Hub 或家裡網路沒反應`
+    } else {
+      r.netlify = 'fail'; r.message = `網站伺服器本身出錯（HTTP ${res.status}），不是家裡的問題`
+    }
+    return r
+  }
   r.netlify = 'ok'
   if (res.status === 401 || msg.includes('還沒設定')) { r.netlify = 'fail'; return r }
-  if (msg.includes('連不到家裡 Hub')) { r.hub = 'fail'; return r }
+  if (msg.includes('連不到家裡 Hub')) { r.hub = 'fail'; r.hint = HINT_HUB; return r }
+  if (msg.includes('等 pos-agent 逾時')) { r.hub = 'ok'; r.posAgent = 'fail'; r.hint = HINT_POS; return r }
   r.hub = 'ok'
   if (msg.includes('pos-relay 未設定') || msg.includes('token 錯誤')) { r.hub = 'fail'; return r }
   if (msg.includes('pos-agent 不在線') || msg.includes('pos-agent 超過')) { r.posAgent = 'fail'; return r }

@@ -59,6 +59,7 @@
               </template>
             </div>
             <p v-if="hub && hub.message" class="mt-2 text-xs" :class="hub.noToken ? 'text-gray-500' : 'text-red-600'">{{ hub.message }}</p>
+            <p v-if="hub && hub.hint" class="mt-1 text-xs text-gray-500">{{ hub.hint }}</p>
           </div>
         </div>
       </div>

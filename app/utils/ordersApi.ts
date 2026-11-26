@@ -119,3 +119,13 @@ if (typeof window !== 'undefined') {
   setTimeout(() => { void flushOrderOutbox() }, 5000)
   setInterval(() => { if (pendingOrders()) void flushOrderOutbox() }, 60000)
 }
+
+/** 修改 / 作廢（刪除）一筆已在資料機上的交易（print-agent 1.17 起）。要連得到資料機才能改，不排隊補送。 */
+export async function editOrder(o: { clientId: string; day: string; changes: Record<string, any>; reason?: string; by?: string; byName?: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { res, error } = await post('edit', { ...o, editId: newClientId() }, 20000)
+  if (!res) return { ok: false, message: error }
+  const data = await res.json().catch(() => null)
+  if (res.status === 404 && (!data?.message || String(data.message).includes('沒有這個功能'))) return { ok: false, message: '資料機的 print-agent 還沒更新到 1.17，不能修改交易紀錄' }
+  if (!res.ok || !data?.ok) return { ok: false, message: errorText(data, res.status) }
+  return { ok: true }
+}

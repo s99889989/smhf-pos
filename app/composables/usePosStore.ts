@@ -103,6 +103,12 @@ export interface Order {
   invoiceIsMock?: boolean
   cashierId?: string      // 結帳人（員工 ID）
   cashierName?: string
+  staffName?: string      // 員工價：買的員工姓名（結帳當下記下來，之後改名也不影響紀錄）
+  vipName?: string        // VIP 價：VIP 姓名
+  note?: string           // 備註（交易紀錄頁修改時可填）
+  voided?: boolean        // 已刪除（作廢標記，資料機原始紀錄保留；統計不算）
+  voidReason?: string
+  edits?: { at: string; by: string; byName: string; reason: string; changes: Record<string, any>; before: Record<string, any> }[] // 修改歷程（資料機 1.17 起）
 }
 
 export interface DiscountType {
@@ -301,6 +307,9 @@ export function usePosStore() {
   // createdAt：有開發票時用資料機的開立時間（收銀電腦時鐘可能不準）
   function addOrder(order: Omit<Order, 'id' | 'no' | 'createdAt' | 'clientId'>, createdAt = new Date()) {
     const no = nextOrderNo(createdAt)
+    // 員工 / VIP 折扣：連姓名一起存，交易紀錄才看得出是誰買的
+    if (order.staffId && !order.staffName) order = { ...order, staffName: employees.value.find(e => e.id === order.staffId)?.name ?? '' }
+    if (order.vipId && !order.vipName) order = { ...order, vipName: vipMembers.value.find(v => v.id === order.vipId)?.name ?? '' }
     const clientId = newClientId()
     orders.value.unshift({ ...order, id: orderSeq.value, no, clientId, createdAt })
     orderSeq.value++

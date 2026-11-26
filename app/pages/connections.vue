@@ -227,7 +227,7 @@ const RECENT_MIN = 30
 
 const PAGE_LABEL: Record<string, string> = {
   '/': '收銀點餐', '/internal-use': '內部領用', '/products': '品項管理', '/materials': '物料庫存',
-  '/staff': '員工管理', '/vip': 'VIP 管理', '/reports': '營業報表', '/shop-orders': '線上訂單',
+  '/staff': '員工管理', '/vip': 'VIP 管理', '/reports': '營業報表', '/transactions': '交易紀錄', '/invoices': '電子發票', '/shop-orders': '線上訂單',
   '/settings': '系統設定', '/connections': '連線狀況',
 }
 function pageLabel(p: string) { return PAGE_LABEL[p] ?? p }

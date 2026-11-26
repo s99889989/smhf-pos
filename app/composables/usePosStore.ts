@@ -38,6 +38,7 @@ export interface ProductMaterial {
 export interface Product {
   id: number
   name: string
+  emoji?: string        // 小圖示（沒有圖片時收銀卡片顯示這個；print-agent 1.14 起）
   price: number
   category: string
   note: string
@@ -53,6 +54,7 @@ export interface Product {
 export interface StationDef {
   id: string
   name: string
+  emoji?: string        // print-agent 1.14 起
   sortOrder: number
 }
 
@@ -60,6 +62,7 @@ export interface StationDef {
 export interface CategoryDef {
   id: string
   name: string
+  emoji?: string        // print-agent 1.14 起
   sortOrder: number
 }
 
@@ -233,6 +236,11 @@ export function usePosStore() {
   function stationName(id: string) {
     return stations.value.find(s => s.id === id)?.name ?? LOC_LABEL[id] ?? id
   }
+  // 畫面用：前面加站別 emoji（列印帳單、發票請用 stationName，印表機印不出 emoji）
+  function stationLabel(id: string) {
+    const e = stations.value.find(s => s.id === id)?.emoji
+    return (e ? e + ' ' : '') + stationName(id)
+  }
 
   // 分類清單：資料機載入後換成資料機的清單（useCatalog）。
   // 畫面用 categoryList：清單依順序，再補上品項有用到、清單裡卻沒有的分類（舊版 print-agent / 範例模式）
@@ -246,6 +254,9 @@ export function usePosStore() {
     }
     return list
   })
+  function categoryEmoji(name: string) {
+    return categories.value.find(c => c.name === name)?.emoji || ''
+  }
 
   // 連得到資料機時，庫存異動寫到資料機（useCatalog）；範例模式才在這裡直接改
   function catalogFailed(e: unknown) {
@@ -347,8 +358,8 @@ export function usePosStore() {
     materials, stockIns, addStockIn,
     internalUses, addInternalUse,
     products, orders, addOrder,
-    stations, stationName,
-    categories, categoryList,
+    stations, stationName, stationLabel,
+    categories, categoryList, categoryEmoji,
     shopOrders, addShopOrder,
   }
 }

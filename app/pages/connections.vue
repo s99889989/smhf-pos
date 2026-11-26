@@ -130,7 +130,7 @@
 import { checkLan, checkHub, deviceId, deviceName, setDeviceName, sendPing,
   type LanCheck, type HubCheck, type HopState, type PresenceList } from '~/utils/presenceApi'
 
-const { stations, stationName } = usePosStore()
+const { stations, stationLabel } = usePosStore()
 
 const lan = ref<LanCheck | null>(null)
 const hub = ref<HubCheck | null>(null)
@@ -245,7 +245,7 @@ const rows = computed(() => {
       min,
       mine: d.deviceId === myId.value,
       label: d.name || (d.via === 'lan' ? d.from : '') || d.deviceId.slice(0, 10),
-      stationLabel: d.station ? stationName(d.station) : (local ? '資料機' : '不指定'),
+      stationLabel: d.station ? stationLabel(d.station) : (local ? '資料機' : '不指定'),
       viaLabel: local ? '資料機本機' : d.via === 'lan' ? `區網（${d.from}）` : d.via === 'hub' ? '家裡 Hub' : d.via,
       agentOld: !!d.agent && d.agent < '1.6',
       stateLabel: active ? '使用中' : recent ? '剛才有用' : '離線',

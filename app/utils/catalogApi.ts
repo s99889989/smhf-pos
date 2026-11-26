@@ -7,8 +7,8 @@ import { hubFetch, lanUnreachable, errorText } from './stationApi'
 
 export interface CatalogAll {
   ok: true
-  stations: { id: string; name: string; sortOrder: number }[]
-  categories?: { id: string; name: string; sortOrder: number }[] // print-agent 1.8 起
+  stations: { id: string; name: string; emoji?: string; sortOrder: number }[]
+  categories?: { id: string; name: string; emoji?: string; sortOrder: number }[] // print-agent 1.8 起；emoji 1.14 起
   products: any[]
   materials: any[]
   logs: any[]

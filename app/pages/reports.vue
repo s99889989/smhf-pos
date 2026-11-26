@@ -209,7 +209,7 @@
                       'bg-green-100 text-green-700': order.location === 'restaurant',
                       'bg-blue-100 text-blue-700':   order.location === 'shop',
                       'bg-amber-100 text-amber-700':  order.location === 'stall',
-                    }">{{ stationName(order.location) }}</span>
+                    }">{{ stationLabel(order.location) }}</span>
                 </td>
                 <td class="px-3 py-3 text-gray-600 text-xs max-w-[160px] truncate">
                   {{ order.items.map(i => i.name).join('、') }}
@@ -239,7 +239,7 @@ import { LOC_LABEL, PAY_LABEL, type Order } from '~/composables/usePosStore'
 import { listEInvoices, formatInvoiceNo, queryEInvoice, queryEInvoiceRange, type InvoiceRecord } from '~/utils/einvoiceApi'
 import { listOrders, pendingOrders } from '~/utils/ordersApi'
 
-const { orders, stations, stationName } = usePosStore()
+const { orders, stations, stationLabel } = usePosStore()
 
 const mode = ref<'daily' | 'monthly'>('daily')
 

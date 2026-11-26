@@ -8,20 +8,20 @@
           <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
           <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
         </div>
-        <!-- 篩選：地點、分類（下拉選單） -->
+        <!-- 篩選：分類、地點（下拉選單） -->
         <div class="flex flex-wrap items-center gap-2">
-          <label class="flex items-center gap-1.5 text-xs text-gray-500">
-            地點
-            <select v-model="filterLoc" class="ifield" style="width:auto; min-width:7rem">
-              <option v-for="loc in filterOptions" :key="loc.value" :value="loc.value">{{ loc.label }}</option>
-            </select>
-          </label>
           <label class="flex items-center gap-1.5 text-xs text-gray-500">
             分類
             <select v-model="filterCat" class="ifield" style="width:auto; min-width:7rem">
               <option value="">全部</option>
-              <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
+              <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.emoji ? c.emoji + ' ' : '' }}{{ c.name }}</option>
               <option :value="NO_CAT">（未分類）</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-1.5 text-xs text-gray-500">
+            地點
+            <select v-model="filterLoc" class="ifield" style="width:auto; min-width:7rem">
+              <option v-for="loc in filterOptions" :key="loc.value" :value="loc.value">{{ loc.label }}</option>
             </select>
           </label>
           <span class="text-xs text-gray-400">共 {{ filteredProducts.length }} 項</span>
@@ -63,6 +63,7 @@
             <td class="py-3 text-gray-400 text-xs">{{ prod.sortOrder }}</td>
             <td class="py-2">
               <CatalogImg v-if="prod.image" :file="prod.image" :alt="prod.name" class="w-12 h-9 object-cover rounded-md bg-gray-100" />
+              <div v-else-if="prod.emoji" class="w-12 h-9 rounded-md bg-gray-50 border border-gray-100 flex items-center justify-center text-2xl leading-none">{{ prod.emoji }}</div>
               <div v-else class="w-12 h-9 rounded-md bg-gray-50 border border-dashed border-gray-200"></div>
             </td>
             <td class="py-3">
@@ -70,7 +71,7 @@
               <div v-if="prod.note" class="text-xs text-gray-400">{{ prod.note }}</div>
             </td>
             <td class="py-3">
-              <span v-if="prod.category" class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{{ prod.category }}</span>
+              <span v-if="prod.category" class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full whitespace-nowrap">{{ categoryEmoji(prod.category) ? categoryEmoji(prod.category) + ' ' : '' }}{{ prod.category }}</span>
               <span v-else class="text-gray-300">—</span>
             </td>
             <td class="py-3 text-right font-semibold text-green-700 whitespace-nowrap">
@@ -90,7 +91,7 @@
                   v-for="loc in prod.locations" :key="loc"
                   class="text-xs px-2 py-0.5 rounded-full"
                   :class="locColor(loc)"
-                >{{ stationName(loc) }}</span>
+                >{{ stationLabel(loc) }}</span>
               </div>
             </td>
             <td class="py-3 pl-4 text-xs text-gray-500">
@@ -112,7 +113,7 @@
     <div v-if="showCats" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showCats = false">
       <div class="bg-white rounded-2xl p-7 w-[440px] max-h-[90vh] overflow-y-auto shadow-2xl">
         <h3 class="text-base font-bold text-gray-900 mb-1">分類管理</h3>
-        <p class="text-xs text-gray-400 mb-4">收銀台的分類頁籤依這裡的順序排列；改名時，用這個分類的品項會一起改。</p>
+        <p class="text-xs text-gray-400 mb-4">收銀台的分類頁籤依這裡的順序排列；改名時，用這個分類的品項會一起改。左邊的按鈕可以選 emoji，會顯示在收銀台的分類頁籤上。</p>
         <p v-if="catError" class="text-xs text-red-600 mb-3">{{ catError }}</p>
 
         <div class="space-y-2">
@@ -121,15 +122,17 @@
               <button @click="moveCat(i, -1)" :disabled="i === 0 || catBusy" class="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="往上">▲</button>
               <button @click="moveCat(i, 1)" :disabled="i === catRows.length - 1 || catBusy" class="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="往下">▼</button>
             </div>
+            <EmojiPicker v-model="c.emoji" />
             <input v-model="c.name" type="text" class="ifield" style="flex:1; min-width:0" @keyup.enter="renameCat(c)">
             <span class="text-xs text-gray-400 whitespace-nowrap w-14 text-right">{{ productCount(c.orig) }} 個品項</span>
-            <button v-if="c.name.trim() !== c.orig" @click="renameCat(c)" :disabled="catBusy" class="text-xs text-blue-500 hover:underline whitespace-nowrap">儲存</button>
+            <button v-if="catChanged(c)" @click="renameCat(c)" :disabled="catBusy" class="text-xs text-blue-500 hover:underline whitespace-nowrap">儲存</button>
             <button v-else @click="removeCat(c)" :disabled="catBusy" class="text-xs text-red-400 hover:underline whitespace-nowrap">刪除</button>
           </div>
           <p v-if="!catRows.length" class="text-sm text-gray-400">還沒有分類</p>
         </div>
 
         <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+          <EmojiPicker v-model="newCatEmoji" />
           <input v-model="newCatName" type="text" class="ifield" style="flex:1; min-width:0" placeholder="新分類名稱，例：飲品" @keyup.enter="addCat">
           <button @click="addCat" :disabled="catBusy" class="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 rounded-lg whitespace-nowrap disabled:opacity-60">＋ 新增分類</button>
         </div>
@@ -164,7 +167,7 @@
                 <div v-if="!quickCat.open" class="flex gap-1.5 items-center">
                   <select v-model="form.category" class="ifield" style="flex:1; min-width:0">
                     <option value="">（未分類）</option>
-                    <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
+                    <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.emoji ? c.emoji + ' ' : '' }}{{ c.name }}</option>
                   </select>
                   <button @click="quickCat.open = true; quickCat.name = ''; quickCat.error = ''" class="text-xs text-green-600 hover:underline whitespace-nowrap" title="新增分類">＋新增</button>
                 </div>
@@ -223,6 +226,14 @@
             </div>
 
             <div>
+              <label class="text-xs text-gray-500 mb-1 block">Emoji 圖示（選填）</label>
+              <div class="flex items-center gap-2">
+                <EmojiPicker v-model="form.emoji" />
+                <span class="text-xs text-gray-400">沒放圖片時，收銀卡片顯示這個；品項管理列表也會看到</span>
+              </div>
+            </div>
+
+            <div>
               <label class="text-xs text-gray-500 mb-2 block">上架站別（可多選）</label>
               <div class="flex flex-wrap gap-x-4 gap-y-2">
                 <label v-for="loc in locationOptions" :key="loc.value" class="flex items-center gap-1.5 cursor-pointer">
@@ -270,7 +281,7 @@
 <script setup lang="ts">
 import type { Product } from '~/composables/usePosStore'
 
-const { products, materials, stations, stationName, categoryList } = usePosStore()
+const { products, materials, stations, stationLabel, categoryList, categoryEmoji } = usePosStore()
 const cat = useCatalog()
 const catState = cat.state
 
@@ -282,8 +293,8 @@ const editId    = ref<number | null>(null)
 const saving    = ref(false)
 const formError = ref('')
 
-const filterOptions = computed(() => [{ value: '', label: '全部' }, ...stations.value.map(s => ({ value: s.id, label: s.name }))])
-const locationOptions = computed(() => stations.value.map(s => ({ value: s.id, label: s.name })))
+const filterOptions = computed(() => [{ value: '', label: '全部' }, ...stations.value.map(s => ({ value: s.id, label: stationLabel(s.id) }))])
+const locationOptions = computed(() => stations.value.map(s => ({ value: s.id, label: stationLabel(s.id) })))
 
 const COLORS = ['bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-pink-100 text-pink-700', 'bg-gray-100 text-gray-600']
 function locColor(id: string) {
@@ -292,7 +303,7 @@ function locColor(id: string) {
 }
 
 const defaultForm = () => ({
-  name: '', price: 0, category: '', note: '',
+  name: '', emoji: '', price: 0, category: '', note: '',
   cashOnly: false,
   openPrice: false,
   locations: [] as string[],
@@ -374,7 +385,7 @@ function openAdd() {
 function openEdit(prod: Product) {
   editId.value = prod.id
   form.value = {
-    name: prod.name, price: prod.price, category: prod.category,
+    name: prod.name, emoji: prod.emoji || '', price: prod.price, category: prod.category,
     note: prod.note, cashOnly: prod.cashOnly, openPrice: !!prod.openPrice,
     locations: [...prod.locations],
     sortOrder: prod.sortOrder,
@@ -394,10 +405,18 @@ async function saveProduct() {
   formError.value = ''
   try {
     const name = form.value.name.trim()
-    await cat.saveProduct({ ...form.value, name, id: editId.value, materials: form.value.materials.filter(m => m.materialId) })
+    // 舊版 print-agent 存不了 emoji：品項其他內容已存好，圖片照樣上傳，最後再顯示提醒
+    let warn = ''
+    try {
+      await cat.saveProduct({ ...form.value, name, id: editId.value, materials: form.value.materials.filter(m => m.materialId) })
+    } catch (e) {
+      if (/1\.14/.test((e as Error).message)) warn = (e as Error).message
+      else throw e
+    }
     const id = editId.value ?? products.value.find(p => p.name === name)?.id
     if (id && imageFile.value) await cat.setProductImage(id, imageFile.value)
     else if (id && imageRemoved.value) await cat.clearProductImage(id)
+    if (warn) { formError.value = warn; editId.value = id ?? editId.value; imageFile.value = null; imageRemoved.value = false; return }
     showModal.value = false
   } catch (e) {
     formError.value = (e as Error).message
@@ -439,14 +458,20 @@ const showCats   = ref(false)
 const catBusy    = ref(false)
 const catError   = ref('')
 const newCatName = ref('')
-const catRows    = ref<{ key: string; id: string; name: string; orig: string; sortOrder: number }[]>([])
+const newCatEmoji = ref('')
+type CatRow = { key: string; id: string; name: string; orig: string; emoji: string; origEmoji: string; sortOrder: number }
+const catRows    = ref<CatRow[]>([])
 function refreshCatRows() {
-  catRows.value = categoryList.value.map((c, i) => ({ key: c.id || 'n:' + c.name, id: c.id, name: c.name, orig: c.name, sortOrder: i + 1 }))
+  catRows.value = categoryList.value.map((c, i) => ({ key: c.id || 'n:' + c.name, id: c.id, name: c.name, orig: c.name, emoji: c.emoji || '', origEmoji: c.emoji || '', sortOrder: i + 1 }))
+}
+function catChanged(c: CatRow) {
+  return c.name.trim() !== c.orig || c.emoji !== c.origEmoji
 }
 function openCats() {
   refreshCatRows()
   catError.value = ''
   newCatName.value = ''
+  newCatEmoji.value = ''
   showCats.value = true
 }
 async function runCat(job: () => Promise<void>) {
@@ -457,17 +482,17 @@ async function runCat(job: () => Promise<void>) {
 function addCat() {
   const name = newCatName.value.trim()
   if (!name) { catError.value = '請輸入分類名稱'; return }
-  runCat(async () => { await cat.saveCategory({ name }); newCatName.value = '' })
+  runCat(async () => { await cat.saveCategory({ name, emoji: newCatEmoji.value || undefined }); newCatName.value = ''; newCatEmoji.value = '' })
 }
-function renameCat(c: { id: string; name: string; orig: string; sortOrder: number }) {
+function renameCat(c: CatRow) {
   const name = c.name.trim()
   if (!name) { catError.value = '分類名稱不能空白'; return }
-  if (name === c.orig) return
+  if (!catChanged(c)) return
   // 清單裡還沒有的（舊資料只寫在品項上）：用舊名建一筆再改名，品項才會一起改
   runCat(async () => {
     let id = c.id
     if (!id) { await cat.saveCategory({ name: c.orig }); id = categoryList.value.find(x => x.name === c.orig)?.id || '' }
-    await cat.saveCategory({ id, name, sortOrder: c.sortOrder })
+    await cat.saveCategory({ id, name, emoji: c.emoji, sortOrder: c.sortOrder })
   })
 }
 function removeCat(c: { id: string; orig: string }) {

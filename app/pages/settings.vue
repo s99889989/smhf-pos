@@ -23,7 +23,7 @@
           </label>
           <label v-for="s in stations" :key="s.id" class="flex items-center gap-2 text-gray-700">
             <input type="radio" name="pos-station" :value="s.id" :checked="station === s.id" @change="writeStation(s.id)">
-            {{ s.name }}
+            {{ s.emoji ? s.emoji + ' ' : '' }}{{ s.name }}
           </label>
         </div>
       </div>
@@ -70,12 +70,14 @@
           </p>
           <p v-if="catState.error && catState.mode !== 'demo'" class="text-xs text-red-600">{{ catState.error }}</p>
           <div v-for="s in stations" :key="s.id" class="flex items-center gap-2">
+            <EmojiPicker v-model="stationEmojis[s.id]" />
             <input v-model="stationNames[s.id]" type="text" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
-            <button @click="renameStation(s.id)" :disabled="!stationNames[s.id] || stationNames[s.id] === s.name"
-                    class="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">改名</button>
+            <button @click="renameStation(s.id)" :disabled="!stationNames[s.id] || (stationNames[s.id] === s.name && (stationEmojis[s.id] || '') === (s.emoji || ''))"
+                    class="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">儲存</button>
             <button @click="removeStation(s.id, s.name)" class="shrink-0 whitespace-nowrap text-xs text-red-400 hover:underline">刪除</button>
           </div>
           <div class="flex items-center gap-2">
+            <EmojiPicker v-model="newStationEmoji" />
             <input v-model="newStation" type="text" placeholder="新增站別，例：市集" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
             <button @click="addStation" :disabled="!newStation.trim()" class="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40">新增</button>
           </div>
@@ -277,13 +279,21 @@ const { stations } = usePosStore()
 const cat = useCatalog()
 const catState = cat.state
 const stationNames = reactive<Record<string, string>>({})
-watch(stations, (list) => { for (const s of list) stationNames[s.id] = s.name }, { immediate: true, deep: true })
+const stationEmojis = reactive<Record<string, string>>({})
+watch(stations, (list) => { for (const s of list) { stationNames[s.id] = s.name; stationEmojis[s.id] = s.emoji || '' } }, { immediate: true, deep: true })
 const newStation = ref('')
+const newStationEmoji = ref('')
 async function run(fn: () => Promise<unknown>) {
   try { await fn() } catch (e) { alert((e as Error).message) }
 }
-const addStation = () => run(async () => { await cat.saveStation({ name: newStation.value.trim() }); newStation.value = '' })
-const renameStation = (id: string) => run(() => cat.saveStation({ id, name: (stationNames[id] ?? '').trim() }))
+const addStation = () => run(async () => {
+  const name = newStation.value.trim()
+  newStation.value = ''
+  const emoji = newStationEmoji.value || undefined
+  newStationEmoji.value = ''
+  await cat.saveStation({ name, emoji })
+})
+const renameStation = (id: string) => run(() => cat.saveStation({ id, name: (stationNames[id] ?? '').trim(), emoji: stationEmojis[id] || '' }))
 function removeStation(id: string, name: string) {
   if (!confirm(`刪除站別「${name}」？品項上的這個站會一起拿掉。`)) return
   run(async () => { await cat.deleteStation(id); if (station.value === id) writeStation('') })

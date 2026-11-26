@@ -13,7 +13,7 @@
                 :class="curCat === c
             ? 'bg-gray-100 text-gray-900 border-gray-400 font-medium'
             : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-        >{{ c }}</button>
+        >{{ catEmoji(c) ? catEmoji(c) + ' ' : '' }}{{ c }}</button>
         <!-- 收銀站在「系統設定」選；沒設定時才在這裡小提示（已設定就不顯示） -->
         <NuxtLink v-if="!station" to="/settings" class="ml-auto shrink-0 whitespace-nowrap self-center text-xs text-amber-600 hover:underline">
           未設定收銀站（顯示全部品項）→ 設定
@@ -38,6 +38,8 @@
             <CatalogImg :file="prod.image" :alt="prod.name"
                         class="w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
           </div>
+          <!-- 沒圖片（或圖載不到）時，有設 emoji 就顯示 emoji -->
+          <div v-else-if="prod.emoji" class="text-4xl leading-none mb-2">{{ prod.emoji }}</div>
           <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
           <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
           <div v-else class="flex items-baseline gap-1.5">
@@ -573,7 +575,7 @@
               <span class="text-gray-800 font-mono font-medium">{{ lastOrder.invoiceNo }}</span>
             </div>
             <div class="flex justify-between"><span>日期</span><span class="text-gray-800">{{ formatDate(lastOrder.createdAt) }}</span></div>
-            <div class="flex justify-between"><span>地點</span><span class="text-gray-800">{{ stationName(lastOrder.location) }}</span></div>
+            <div class="flex justify-between"><span>地點</span><span class="text-gray-800">{{ stationLabel(lastOrder.location) }}</span></div>
             <div v-if="lastOrder.cashierName" class="flex justify-between"><span>結帳人</span><span class="text-gray-800">{{ lastOrder.cashierName }}</span></div>
             <div v-if="lastOrder.discountLabel" class="flex justify-between">
               <span>折扣</span><span class="text-purple-600 font-medium">{{ lastOrder.discountLabel }}</span>
@@ -659,7 +661,8 @@
   import { buildBillLines, type BillLine, type BillOrder } from '~/utils/billPrint'
   import { useGuidedCheckout, loadGuidedCheckout } from '~/composables/useGuidedCheckout'
 
-  const { products, discountTypes, employees, vipMembers, addOrder, stationName, categoryList } = usePosStore()
+  const { products, discountTypes, employees, vipMembers, addOrder, stationLabel, categoryList, categoryEmoji } = usePosStore()
+  const catEmoji = (c: string) => (c === '全部' ? '' : categoryEmoji(c))
 
 
   // 商品圖片（資料機上的縮圖，<CatalogImg> 會依區網 / Hub 取圖）；載不到的就只顯示文字

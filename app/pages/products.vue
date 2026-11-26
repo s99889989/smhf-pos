@@ -2,12 +2,12 @@
   <div class="flex flex-col h-full overflow-hidden">
 
     <!-- 頁頭 -->
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
         <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button @click="openCats" class="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
           分類管理
         </button>
@@ -18,7 +18,7 @@
     </div>
 
     <!-- 篩選 -->
-    <div class="bg-white border-b border-gray-200 px-6 py-2.5 flex gap-2 overflow-x-auto shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-2.5 flex gap-2 overflow-x-auto shrink-0">
       <button
         v-for="loc in filterOptions" :key="loc.value"
         @click="filterLoc = loc.value"
@@ -34,7 +34,7 @@
     </div>
 
     <!-- 表格 -->
-    <div class="flex-1 overflow-auto px-6 py-4">
+    <div class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-xs text-gray-400 border-b border-gray-200">

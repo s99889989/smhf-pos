@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
 
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-4 shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div class="min-w-0">
         <h1 class="text-lg font-bold text-gray-900">連線狀況</h1>
         <p class="text-xs text-gray-400 mt-0.5">哪幾台正在用收銀系統、這台連不連得到資料機。每分鐘自動更新。</p>
@@ -15,7 +15,7 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+    <div class="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
 
       <!-- 總覽：資料機、Hub、pos-agent、各站 -->
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

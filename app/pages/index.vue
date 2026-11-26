@@ -1,11 +1,11 @@
 <template>
   <div class="flex h-full">
 
-    <!-- 品項區 -->
-    <div class="flex flex-col flex-1 overflow-hidden">
+    <!-- 品項區（手機：和訂單區二選一切換，見 mobileView） -->
+    <div class="flex-col flex-1 min-w-0 overflow-hidden" :class="mobileView === 'cart' ? 'hidden md:flex' : 'flex'">
 
       <!-- 分類 -->
-      <div class="bg-white border-b border-gray-200 px-5 py-2.5 flex gap-2 overflow-x-auto">
+      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex gap-2 overflow-x-auto shrink-0">
         <button
                 v-for="c in categories" :key="c"
                 @click="curCat = c"
@@ -21,7 +21,7 @@
       </div>
 
       <!-- 品項卡片 -->
-      <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
+      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 content-start">
         <button
                 v-for="prod in filteredProducts" :key="prod.id"
                 @click="addItem(prod)"
@@ -50,13 +50,28 @@
           此地點沒有此分類的品項
         </div>
       </div>
+
+      <!-- 手機底部列：件數、合計，點了切到訂單區結帳 -->
+      <div class="md:hidden shrink-0 bg-white border-t border-gray-200 px-3 py-2 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs text-gray-400">{{ cart.length ? `共 ${cartCount} 件` : '尚未選擇品項' }}</div>
+          <div class="text-xl font-bold text-gray-900 leading-tight">${{ total }}</div>
+        </div>
+        <button @click="mobileView = 'cart'"
+                class="shrink-0 px-5 py-3 rounded-xl font-bold text-base transition-colors"
+                :class="cart.length ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-500'"
+        >{{ guided ? '訂單 ▶' : '訂單／結帳 ▶' }}</button>
+      </div>
     </div>
 
     <!-- 訂單區 -->
-    <div class="w-80 lg:w-96 border-l border-gray-200 bg-white flex flex-col shrink-0">
+    <!-- 手機：佔滿整個寬度，內容太高時整欄捲動；平板、電腦：右側固定寬度 -->
+    <div class="w-full md:w-80 lg:w-96 md:border-l border-gray-200 bg-white flex-col shrink-0 overflow-y-auto md:overflow-hidden"
+         :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
 
-      <div class="px-4 py-3.5 border-b border-gray-200 flex justify-between items-center">
-        <span class="font-semibold text-gray-900 whitespace-nowrap">訂單明細</span>
+      <div class="px-3 md:px-4 py-2.5 md:py-3.5 border-b border-gray-200 flex justify-between items-center shrink-0">
+        <button @click="mobileView = 'products'" class="md:hidden whitespace-nowrap text-sm font-medium text-green-700 px-2 py-1.5 -ml-1 rounded-lg active:bg-green-50">◀ 選商品</button>
+        <span class="hidden md:inline font-semibold text-gray-900 whitespace-nowrap">訂單明細</span>
         <div class="flex items-center gap-1">
           <button @click="testPrint" class="whitespace-nowrap text-xs text-blue-500 hover:bg-blue-50 px-2 py-1 rounded transition-colors">🖨 測試列印</button>
           <button @click="printCartBill" :disabled="!cart.length" class="whitespace-nowrap text-xs text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🧾 帳單</button>
@@ -92,7 +107,7 @@
       </div>
 
       <!-- 訂單列表 -->
-      <div class="flex-1 overflow-y-auto px-3 py-2">
+      <div class="flex-1 overflow-y-auto px-3 py-2" style="min-height:7rem">
         <div v-if="!cart.length" class="h-full flex flex-col items-center justify-center gap-2 text-gray-300">
           <span class="text-4xl">🛒</span>
           <span class="text-sm">尚未選擇品項</span>
@@ -106,16 +121,16 @@
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <button @click="changeQty(i, -1)" class="w-6 h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">−</button>
+            <button @click="changeQty(i, -1)" class="w-8 h-8 md:w-6 md:h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">−</button>
             <span class="w-6 text-center text-sm font-semibold">{{ item.qty }}</span>
-            <button @click="changeQty(i, 1)"  class="w-6 h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">+</button>
+            <button @click="changeQty(i, 1)"  class="w-8 h-8 md:w-6 md:h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">+</button>
           </div>
           <div class="text-sm font-medium text-gray-900 w-14 text-right">${{ item.finalPrice * item.qty }}</div>
         </div>
       </div>
 
       <!-- 結帳區 -->
-      <div class="border-t border-gray-200 p-4">
+      <div class="border-t border-gray-200 p-4 shrink-0">
         <div v-if="curDiscount && curDiscount.rate < 1" class="space-y-1 mb-2">
           <div class="flex justify-between text-xs text-gray-400">
             <span>小計</span><span>${{ subtotal }}</span>
@@ -630,6 +645,8 @@
 
   const curLoc      = ref<string>('')   // = 本機收銀站；沒設定時是空的（顯示全部品項）
   const curCat      = ref('全部')
+  // 手機（寬 < 768px）一次只顯示一區：選商品 / 訂單結帳；平板、電腦兩區並排，這個值沒作用
+  const mobileView  = ref<'products' | 'cart'>('products')
   const curPay      = ref<'cash' | 'card' | 'hua' | 'voucher'>('cash')
   const voucherAmount = ref(0)
   const receivedCash  = ref(0)
@@ -884,6 +901,7 @@
     lastOrder.value = orders.value[0]
     showReceipt.value = true
     cart.value = []
+    mobileView.value = 'products'
     curDiscount.value = enabledDiscounts.value[0] ?? null
     voucherAmount.value = 0
     receivedCash.value = 0

@@ -1,13 +1,13 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
 
-    <div class="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 shrink-0">
       <h1 class="text-lg font-bold text-gray-900">系統設定</h1>
       <p class="text-xs text-gray-400 mt-0.5">折扣類型與其他設定</p>
     </div>
 
     <!-- 依視窗寬度排成 1～3 欄（CSS columns，卡片高度不同也不會留大洞；XP 的 Mypal 也支援） -->
-    <div class="flex-1 overflow-y-auto px-6 py-5">
+    <div class="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-5">
      <div class="columns-1 lg:columns-2 2xl:columns-3 gap-6">
 
       <!-- 本機收銀站 -->
@@ -49,7 +49,7 @@
 
       <!-- 站別與資料機 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
-        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">收銀站別</h2>
             <p class="text-xs text-gray-400 mt-0.5">各站共用同一份品項與庫存；品項在「品項管理」勾選上架哪幾站</p>
@@ -70,21 +70,21 @@
           </p>
           <p v-if="catState.error && catState.mode !== 'demo'" class="text-xs text-red-600">{{ catState.error }}</p>
           <div v-for="s in stations" :key="s.id" class="flex items-center gap-2">
-            <input v-model="stationNames[s.id]" type="text" class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
+            <input v-model="stationNames[s.id]" type="text" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
             <button @click="renameStation(s.id)" :disabled="!stationNames[s.id] || stationNames[s.id] === s.name"
-                    class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">改名</button>
-            <button @click="removeStation(s.id, s.name)" class="text-xs text-red-400 hover:underline">刪除</button>
+                    class="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">改名</button>
+            <button @click="removeStation(s.id, s.name)" class="shrink-0 whitespace-nowrap text-xs text-red-400 hover:underline">刪除</button>
           </div>
           <div class="flex items-center gap-2">
-            <input v-model="newStation" type="text" placeholder="新增站別，例：市集" class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
-            <button @click="addStation" :disabled="!newStation.trim()" class="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40">新增</button>
+            <input v-model="newStation" type="text" placeholder="新增站別，例：市集" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900">
+            <button @click="addStation" :disabled="!newStation.trim()" class="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40">新增</button>
           </div>
         </div>
       </div>
 
       <!-- 電子發票 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
-        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">電子發票</h2>
             <p class="text-xs text-gray-400 mt-0.5">加值中心 Cetustek：號碼批次、上傳狀態</p>
@@ -132,7 +132,7 @@
 
       <!-- 折扣類型管理 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
-        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 class="text-sm font-semibold text-gray-800">折扣類型</h2>
             <p class="text-xs text-gray-400 mt-0.5">收銀頁面會顯示已啟用的折扣</p>
@@ -145,7 +145,7 @@
 
         <div class="divide-y divide-gray-100">
           <div v-for="d in discountTypes" :key="d.id"
-            class="px-5 py-4 flex items-center gap-4"
+            class="px-4 md:px-5 py-4 flex flex-wrap md:flex-nowrap items-center gap-x-3 md:gap-x-4 gap-y-2"
             :class="!d.enabled ? 'opacity-50' : ''">
 
             <!-- 啟用開關：內建折扣不可停用 -->
@@ -161,8 +161,8 @@
               </div>
             </div>
 
-            <div class="flex-1">
-              <div class="flex items-center gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span class="text-sm font-medium text-gray-900">{{ d.label }}</span>
                 <span v-if="d.builtIn" class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">系統內建</span>
                 <span v-if="d.requireStaff" class="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">需員工</span>
@@ -179,7 +179,7 @@
               <span v-else class="text-sm font-bold text-purple-600">{{ rateLabel(d.rate) }}</span>
             </div>
 
-            <div class="flex gap-2 shrink-0">
+            <div class="flex gap-3 shrink-0 whitespace-nowrap">
               <button @click="openEdit(d)" class="text-xs text-blue-500 hover:underline">編輯</button>
               <button v-if="!d.builtIn" @click="deleteDiscount(d.id)" class="text-xs text-red-400 hover:underline">刪除</button>
               <span v-else class="text-xs text-gray-300 cursor-not-allowed" title="系統內建不可刪除">刪除</span>

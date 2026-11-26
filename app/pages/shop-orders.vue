@@ -1,12 +1,12 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 shrink-0">
       <h1 class="text-lg font-bold text-gray-900">線上訂單管理</h1>
       <p class="text-xs text-gray-400 mt-0.5">管理客人線上購物訂單與出貨</p>
     </div>
 
     <!-- 狀態篩選 -->
-    <div class="bg-white border-b border-gray-100 px-6 py-2.5 flex gap-2 shrink-0">
+    <div class="bg-white border-b border-gray-100 px-4 md:px-6 py-2.5 flex gap-2 shrink-0">
       <button v-for="s in statusFilters" :key="s.value"
         @click="filterStatus = s.value"
         class="px-4 py-1.5 rounded-full text-sm border transition-colors whitespace-nowrap"
@@ -16,7 +16,7 @@
       </button>
     </div>
 
-    <div class="flex-1 overflow-auto px-6 py-4">
+    <div class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <div v-if="!filteredOrders.length" class="py-20 text-center text-gray-300 text-sm">尚無訂單</div>
 
       <div v-for="order in filteredOrders" :key="order.id"
@@ -130,7 +130,7 @@
             備註：{{ labelOrder.note }}
           </div>
         </div>
-        <div class="flex gap-2 px-6 pb-6">
+        <div class="flex gap-2 px-4 md:px-6 pb-6">
           <button @click="showLabelModal=false" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">關閉</button>
           <button @click="printLabel" class="flex-1 py-2.5 rounded-xl bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900">🖨 列印</button>
         </div>

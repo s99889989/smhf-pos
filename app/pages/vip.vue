@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">VIP 管理</h1>
         <p class="text-xs text-gray-400 mt-0.5">結帳 VIP 折扣時會要求輸入 VIP 號碼驗證</p>
@@ -11,12 +11,12 @@
     </div>
 
     <!-- 搜尋 -->
-    <div class="bg-white border-b border-gray-100 px-6 py-3 shrink-0">
+    <div class="bg-white border-b border-gray-100 px-4 md:px-6 py-3 shrink-0">
       <input v-model="search" type="text" placeholder="搜尋 VIP 號碼或姓名..."
         style="width:280px; border:1px solid #e5e7eb; border-radius:10px; padding:7px 12px; font-size:13px; outline:none; color:#111;">
     </div>
 
-    <div class="flex-1 overflow-auto px-6 py-4">
+    <div class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-xs text-gray-400 border-b border-gray-200">

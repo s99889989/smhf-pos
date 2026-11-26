@@ -2,12 +2,12 @@
   <div class="flex flex-col h-full overflow-hidden">
 
     <!-- 頁頭 -->
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">物料庫存</h1>
         <p class="text-xs text-gray-400 mt-0.5">管理原料庫存與入庫紀錄</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button v-for="tab in tabs" :key="tab.value" @click="activeTab = tab.value"
           class="text-sm font-medium px-4 py-2 rounded-xl border transition-colors"
           :class="activeTab === tab.value ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'">
@@ -21,14 +21,14 @@
     </div>
 
     <!-- 庫存警示 -->
-    <div v-if="lowStockItems.length" class="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center gap-2 shrink-0">
+    <div v-if="lowStockItems.length" class="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-3 flex items-center gap-2 shrink-0">
       <span class="text-amber-600">⚠️</span>
       <span class="text-sm text-amber-700 font-medium">庫存不足：</span>
       <span class="text-sm text-amber-700">{{ lowStockItems.map(m => m.name).join('、') }}</span>
     </div>
 
     <!-- ── 庫存列表 ── -->
-    <div v-if="activeTab === 'stock'" class="flex-1 overflow-auto px-6 py-4">
+    <div v-if="activeTab === 'stock'" class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-xs text-gray-400 border-b border-gray-200">
@@ -72,10 +72,10 @@
     </div>
 
     <!-- ── 入庫作業：左日曆 + 右表單 ── -->
-    <div v-if="activeTab === 'stockin'" class="flex-1 overflow-hidden flex gap-0">
+    <div v-if="activeTab === 'stockin'" class="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row gap-0">
 
       <!-- 左：日曆 -->
-      <div class="w-72 border-r border-gray-200 bg-white flex flex-col shrink-0 p-4 overflow-y-auto">
+      <div class="w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-200 bg-white flex flex-col shrink-0 p-4 md:overflow-y-auto">
         <!-- 月份導航 -->
         <div class="flex items-center justify-between mb-3">
           <button @click="prevMonth" class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 text-sm">‹</button>
@@ -109,10 +109,10 @@
       </div>
 
       <!-- 右：表單 + 當日紀錄 -->
-      <div class="flex-1 overflow-y-auto flex flex-col">
+      <div class="flex-1 md:overflow-y-auto flex flex-col">
 
         <!-- 選定日期標題 -->
-        <div class="px-6 py-4 border-b border-gray-100 bg-white shrink-0">
+        <div class="px-4 md:px-6 py-4 border-b border-gray-100 bg-white shrink-0">
           <div class="text-base font-semibold text-gray-800">{{ selectedDateLabel }}</div>
           <div class="text-xs text-gray-400 mt-0.5">{{ dayLogs.length ? `已有 ${dayLogs.length} 筆入庫` : '尚無入庫紀錄' }}</div>
         </div>
@@ -182,32 +182,34 @@
             <div class="px-5 py-3 border-b border-gray-100">
               <h3 class="text-sm font-semibold text-gray-700">{{ selectedDateLabel }} 入庫紀錄</h3>
             </div>
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
-                  <th class="text-left px-5 py-2.5 font-medium">時間</th>
-                  <th class="text-left px-3 py-2.5 font-medium">物料</th>
-                  <th class="text-right px-3 py-2.5 font-medium">數量</th>
-                  <th class="text-left px-3 py-2.5 font-medium">來源</th>
-                  <th class="text-left px-5 py-2.5 font-medium">備註</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="log in dayLogs" :key="log.id" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td class="px-5 py-3 text-gray-500 text-xs">{{ formatTime(log.createdAt) }}</td>
-                  <td class="px-3 py-3 font-medium text-gray-900">{{ log.materialName }}</td>
-                  <td class="px-3 py-3 text-right font-bold text-green-700">+{{ log.quantity }}</td>
-                  <td class="px-3 py-3 text-xs">
-                    <span v-if="log.source" class="px-2 py-0.5 rounded-full text-xs font-medium"
-                      :class="log.source === '農莊烘焙' ? 'bg-green-100 text-green-700' : log.source === '合作商' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'">
-                      {{ log.source }}
-                    </span>
-                    <span v-else class="text-gray-300">—</span>
-                  </td>
-                  <td class="px-5 py-3 text-gray-400 text-xs">{{ log.note || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
+                    <th class="text-left px-5 py-2.5 font-medium">時間</th>
+                    <th class="text-left px-3 py-2.5 font-medium">物料</th>
+                    <th class="text-right px-3 py-2.5 font-medium">數量</th>
+                    <th class="text-left px-3 py-2.5 font-medium">來源</th>
+                    <th class="text-left px-5 py-2.5 font-medium">備註</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="log in dayLogs" :key="log.id" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                    <td class="px-5 py-3 text-gray-500 text-xs">{{ formatTime(log.createdAt) }}</td>
+                    <td class="px-3 py-3 font-medium text-gray-900">{{ log.materialName }}</td>
+                    <td class="px-3 py-3 text-right font-bold text-green-700">+{{ log.quantity }}</td>
+                    <td class="px-3 py-3 text-xs">
+                      <span v-if="log.source" class="px-2 py-0.5 rounded-full text-xs font-medium"
+                        :class="log.source === '農莊烘焙' ? 'bg-green-100 text-green-700' : log.source === '合作商' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'">
+                        {{ log.source }}
+                      </span>
+                      <span v-else class="text-gray-300">—</span>
+                    </td>
+                    <td class="px-5 py-3 text-gray-400 text-xs">{{ log.note || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>
@@ -215,7 +217,7 @@
     </div>
 
     <!-- ── 入庫紀錄 ── -->
-    <div v-if="activeTab === 'log'" class="flex-1 overflow-auto px-6 py-4">
+    <div v-if="activeTab === 'log'" class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <div class="flex gap-3 mb-4 items-center flex-wrap">
         <span class="text-xs text-gray-400">物料：</span>
         <select v-model.number="logFilter"

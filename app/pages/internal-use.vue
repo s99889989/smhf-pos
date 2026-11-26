@@ -1,11 +1,11 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">內部領用</h1>
         <p class="text-xs text-gray-400 mt-0.5">直接扣庫存，不走收銀流程（例：餐廳內用麵包）</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button v-for="tab in tabs" :key="tab.value" @click="activeTab = tab.value"
           class="text-sm font-medium px-4 py-2 rounded-xl border transition-colors"
           :class="activeTab === tab.value ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'">
@@ -15,10 +15,10 @@
     </div>
 
     <!-- ── 領用作業：左日曆 + 右表單 ── -->
-    <div v-if="activeTab === 'form'" class="flex-1 overflow-hidden flex">
+    <div v-if="activeTab === 'form'" class="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
 
       <!-- 左：日曆 -->
-      <div class="w-72 border-r border-gray-200 bg-white flex flex-col shrink-0 p-4 overflow-y-auto">
+      <div class="w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-200 bg-white flex flex-col shrink-0 p-4 md:overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
           <button @click="prevMonth" class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 text-sm">‹</button>
           <span class="text-sm font-semibold text-gray-800">{{ calTitle }}</span>
@@ -47,13 +47,13 @@
       </div>
 
       <!-- 右：表單 + 當日紀錄 -->
-      <div class="flex-1 overflow-y-auto flex flex-col">
-        <div class="px-6 py-4 border-b border-gray-100 bg-white shrink-0">
+      <div class="flex-1 md:overflow-y-auto flex flex-col">
+        <div class="px-4 md:px-6 py-4 border-b border-gray-100 bg-white shrink-0">
           <div class="text-base font-semibold text-gray-800">{{ selectedDateLabel }}</div>
           <div class="text-xs text-gray-400 mt-0.5">{{ dayLogs.length ? `已有 ${dayLogs.length} 筆領用` : '尚無領用紀錄' }}</div>
         </div>
 
-        <div class="flex-1 p-6 space-y-5">
+        <div class="flex-1 p-3 md:p-6 space-y-5">
 
           <!-- 新增領用表單 -->
           <div class="bg-white rounded-2xl border border-gray-200 p-5">
@@ -125,26 +125,28 @@
             <div class="px-5 py-3 border-b border-gray-100">
               <h3 class="text-sm font-semibold text-gray-700">{{ selectedDateLabel }} 領用紀錄</h3>
             </div>
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
-                  <th class="text-left px-5 py-2.5 font-medium">時間</th>
-                  <th class="text-left px-3 py-2.5 font-medium">物料</th>
-                  <th class="text-right px-3 py-2.5 font-medium">數量</th>
-                  <th class="text-left px-5 py-2.5 font-medium">用途</th>
-                  <th class="text-left px-5 py-2.5 font-medium">領用人</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="log in dayLogs" :key="log.id" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td class="px-5 py-3 text-gray-500 text-xs">{{ formatTime(log.createdAt) }}</td>
-                  <td class="px-3 py-3 font-medium text-gray-900">{{ log.materialName }}</td>
-                  <td class="px-3 py-3 text-right font-bold text-amber-600">-{{ log.quantity }}</td>
-                  <td class="px-5 py-3 text-gray-600 text-xs">{{ log.purpose }}</td>
-                  <td class="px-5 py-3 text-gray-400 text-xs">{{ log.operator || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
+                    <th class="text-left px-5 py-2.5 font-medium">時間</th>
+                    <th class="text-left px-3 py-2.5 font-medium">物料</th>
+                    <th class="text-right px-3 py-2.5 font-medium">數量</th>
+                    <th class="text-left px-5 py-2.5 font-medium">用途</th>
+                    <th class="text-left px-5 py-2.5 font-medium">領用人</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="log in dayLogs" :key="log.id" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                    <td class="px-5 py-3 text-gray-500 text-xs">{{ formatTime(log.createdAt) }}</td>
+                    <td class="px-3 py-3 font-medium text-gray-900">{{ log.materialName }}</td>
+                    <td class="px-3 py-3 text-right font-bold text-amber-600">-{{ log.quantity }}</td>
+                    <td class="px-5 py-3 text-gray-600 text-xs">{{ log.purpose }}</td>
+                    <td class="px-5 py-3 text-gray-400 text-xs">{{ log.operator || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>
@@ -152,7 +154,7 @@
     </div>
 
     <!-- ── 領用紀錄 ── -->
-    <div v-if="activeTab === 'log'" class="flex-1 overflow-auto px-6 py-4">
+    <div v-if="activeTab === 'log'" class="flex-1 overflow-auto px-4 md:px-6 py-4">
       <div class="flex gap-3 mb-4 items-center">
         <span class="text-xs text-gray-400">篩選物料：</span>
         <select v-model.number="logFilter"

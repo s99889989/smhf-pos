@@ -1,6 +1,56 @@
 <template>
-  <div class="flex h-screen bg-gray-50 overflow-hidden">
-    <aside class="bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-200" :class="sidebarCollapsed ? 'w-14' : 'w-56'">
+  <!-- app-shell：高度 100vh，支援的瀏覽器改用 100dvh（手機網址列收合時不會被切掉）；寫在 input.css -->
+  <div class="app-shell flex flex-col md:flex-row bg-gray-50 overflow-hidden">
+
+    <!-- 手機（寬 < 768px）：上方標題列 + 漢堡選單；平板、電腦維持左側選單 -->
+    <header class="md:hidden shrink-0 h-12 bg-white border-b border-gray-200 flex items-center gap-1 px-1.5">
+      <button @click="mobileNavOpen = true" aria-label="開啟選單"
+        class="w-10 h-10 rounded-lg flex items-center justify-center text-gray-500 active:bg-gray-100">
+        <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <line x1="2" y1="4" x2="12" y2="4"/>
+          <line x1="2" y1="7" x2="12" y2="7"/>
+          <line x1="2" y1="10" x2="12" y2="10"/>
+        </svg>
+      </button>
+      <span class="text-lg leading-none">{{ currentItem?.icon || '🌿' }}</span>
+      <span class="flex-1 min-w-0 truncate font-semibold text-gray-900 text-base ml-1">{{ currentItem?.label || '聖母健康農莊' }}</span>
+      <span class="text-xs text-gray-400 tabular-nums mr-1">{{ shortTime }}</span>
+    </header>
+
+    <!-- 手機選單（從左邊滑出）；點遮罩或換頁就關 -->
+    <div v-if="mobileNavOpen" class="md:hidden fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/40" @click="mobileNavOpen = false"></div>
+      <div class="absolute top-0 bottom-0 left-0 w-72 bg-white shadow-2xl flex flex-col" style="max-width:85vw">
+        <div class="flex items-center border-b border-gray-200 h-12 px-3 gap-2 shrink-0">
+          <span class="text-green-700 text-lg shrink-0">🌿</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-green-700 font-bold text-sm leading-tight truncate">聖母健康農莊</div>
+            <div class="text-gray-400 text-xs">POS 收銀系統</div>
+          </div>
+          <button @click="mobileNavOpen = false" aria-label="關閉選單"
+            class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 text-xl active:bg-gray-100">✕</button>
+        </div>
+        <nav class="flex-1 overflow-y-auto px-3 pb-3">
+          <template v-for="section in navSections" :key="section.label">
+            <div class="text-xs text-gray-400 font-semibold tracking-wide px-1 mt-3">{{ section.label }}</div>
+            <div class="grid grid-cols-3 gap-x-1 gap-y-3 pt-2 pb-1">
+              <NuxtLink v-for="item in section.items" :key="item.to" :to="item.to"
+                class="nav-tile flex flex-col items-center min-w-0 text-center"
+                :class="isActive(item.to) ? 'nav-tile-active text-green-700' : 'text-gray-600'">
+                <span class="nav-tile-icon flex items-center justify-center rounded-2xl bg-gray-100 leading-none w-14 h-14 text-2xl">{{ item.icon }}</span>
+                <span class="mt-1.5 w-full text-xs font-medium leading-tight break-words">{{ item.label }}</span>
+              </NuxtLink>
+            </div>
+          </template>
+        </nav>
+        <div class="py-2.5 px-3 border-t border-gray-200 flex items-center gap-2 shrink-0">
+          <div class="text-xs text-gray-400 flex-1 min-w-0 truncate">{{ clock }}</div>
+          <ThemeToggle />
+        </div>
+      </div>
+    </div>
+
+    <aside class="bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 transition-all duration-200" :class="sidebarCollapsed ? 'w-14' : 'w-56'">
 
       <!-- Logo -->
       <!-- 收合時：只留一個置中的按鈕，平常顯示葉子，滑過時換成選單圖示，點了展開 -->
@@ -87,7 +137,7 @@
       {{ tip.label }}
     </div>
 
-    <main class="flex-1 overflow-hidden">
+    <main class="flex-1 min-h-0 min-w-0 overflow-hidden">
       <slot />
     </main>
   </div>
@@ -154,6 +204,11 @@ function onNavHover(e: MouseEvent) {
 function hideTip() { tip.value = null }
 watch(sidebarCollapsed, hideTip)
 watch(() => route.path, hideTip)
+
+// 手機選單：換頁就收起來
+const mobileNavOpen = ref(false)
+watch(() => route.path, () => { mobileNavOpen.value = false })
+const currentItem = computed(() => navSections.flatMap(s => s.items).find(i => isActive(i.to)))
 
 function isActive(to: string) {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)

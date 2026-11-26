@@ -2,7 +2,7 @@
   <div class="flex flex-col h-full overflow-hidden">
 
     <!-- 頁頭 -->
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">營業報表</h1>
         <p class="text-xs text-gray-400 mt-0.5">收銀紀錄與統計</p>
@@ -38,10 +38,10 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+    <div class="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
 
       <!-- 統計卡 -->
-      <div class="grid grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <div v-for="stat in stats" :key="stat.label" class="bg-white rounded-xl border border-gray-200 p-4">
           <div class="text-xs text-gray-400 mb-1">{{ stat.label }}</div>
           <div class="text-2xl font-bold" :class="stat.color">{{ stat.value }}</div>
@@ -49,7 +49,7 @@
       </div>
 
       <!-- 各地點 + 付款方式 -->
-      <div class="grid gap-4" :class="cashierStats.length ? 'grid-cols-3' : 'grid-cols-2'">
+      <div class="grid grid-cols-1 gap-4" :class="cashierStats.length ? 'md:grid-cols-3' : 'md:grid-cols-2'">
         <!-- 地點 -->
         <div class="bg-white rounded-xl border border-gray-200 p-5">
           <h2 class="text-sm font-semibold text-gray-700 mb-4">各地點營業額</h2>
@@ -118,7 +118,7 @@
         </div>
         <div v-if="invError" class="px-5 py-4 text-sm text-amber-600">{{ invError }}</div>
         <template v-else>
-          <div class="grid grid-cols-5 gap-3 px-5 py-4 border-b border-gray-100">
+          <div class="grid grid-cols-3 md:grid-cols-5 gap-3 px-5 py-4 border-b border-gray-100">
             <div v-for="s in invStats" :key="s.label">
               <div class="text-xs text-gray-400 mb-0.5">{{ s.label }}</div>
               <div class="text-lg font-bold" :class="s.color">{{ s.value }}</div>
@@ -128,7 +128,7 @@
           <div v-if="!shownInvoices.length" class="py-10 text-center text-gray-300 text-sm">
             {{ invLoading ? '讀取中…' : invProblemsOnly ? '沒有待處理的發票' : (mode === 'daily' ? '此日' : '此月') + '沒有開立發票' }}
           </div>
-          <div v-else class="overflow-y-auto" style="max-height:70vh;">
+          <div v-else class="overflow-auto" style="max-height:70vh;">
             <table class="w-full text-sm">
               <thead class="sticky top-0">
                 <tr class="text-xs text-gray-400 border-b border-gray-200 bg-gray-50">
@@ -185,47 +185,49 @@
         <div v-if="!filteredOrders.length" class="py-16 text-center text-gray-300 text-sm">
           {{ mode === 'daily' ? '此日' : '此月' }}尚無交易紀錄
         </div>
-        <table v-else class="w-full text-sm">
-          <thead>
-            <tr class="text-xs text-gray-400 border-b border-gray-200 bg-gray-50">
-              <th class="text-left px-5 py-2.5 font-medium">單號</th>
-              <th class="text-left px-3 py-2.5 font-medium">時間</th>
-              <th class="text-left px-3 py-2.5 font-medium">地點</th>
-              <th class="text-left px-3 py-2.5 font-medium">品項</th>
-              <th class="text-left px-3 py-2.5 font-medium">付款</th>
-              <th class="text-left px-3 py-2.5 font-medium">結帳人</th>
-              <th class="text-left px-3 py-2.5 font-medium">發票</th>
-              <th class="text-right px-5 py-2.5 font-medium">金額</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="order in filteredOrders" :key="order.clientId || order.id" class="border-b border-gray-100 hover:bg-gray-50">
-              <td class="px-5 py-3 font-medium text-gray-900">{{ order.no }}</td>
-              <td class="px-3 py-3 text-gray-500 text-xs">{{ formatTime(order.createdAt) }}</td>
-              <td class="px-3 py-3">
-                <span class="text-xs px-2 py-0.5 rounded-full"
-                  :class="{
-                    'bg-green-100 text-green-700': order.location === 'restaurant',
-                    'bg-blue-100 text-blue-700':   order.location === 'shop',
-                    'bg-amber-100 text-amber-700':  order.location === 'stall',
-                  }">{{ stationName(order.location) }}</span>
-              </td>
-              <td class="px-3 py-3 text-gray-600 text-xs max-w-[160px] truncate">
-                {{ order.items.map(i => i.name).join('、') }}
-              </td>
-              <td class="px-3 py-3 text-gray-500 text-xs">{{ PAY_LABEL[order.payMethod] }}</td>
-              <td class="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{{ order.cashierName || '—' }}</td>
-              <td class="px-3 py-3 text-xs whitespace-nowrap">
-                <template v-if="orderInv(order)">
-                  <span class="font-mono text-gray-700">{{ orderInv(order)!.no }}</span>
-                  <span class="ml-1 px-1.5 py-0.5 rounded" :class="orderInv(order)!.cls">{{ orderInv(order)!.label }}</span>
-                </template>
-                <span v-else class="text-gray-300">—</span>
-              </td>
-              <td class="px-5 py-3 text-right font-bold text-gray-900">${{ order.total.toLocaleString() }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-gray-400 border-b border-gray-200 bg-gray-50">
+                <th class="text-left px-5 py-2.5 font-medium">單號</th>
+                <th class="text-left px-3 py-2.5 font-medium">時間</th>
+                <th class="text-left px-3 py-2.5 font-medium">地點</th>
+                <th class="text-left px-3 py-2.5 font-medium">品項</th>
+                <th class="text-left px-3 py-2.5 font-medium">付款</th>
+                <th class="text-left px-3 py-2.5 font-medium">結帳人</th>
+                <th class="text-left px-3 py-2.5 font-medium">發票</th>
+                <th class="text-right px-5 py-2.5 font-medium">金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in filteredOrders" :key="order.clientId || order.id" class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-5 py-3 font-medium text-gray-900">{{ order.no }}</td>
+                <td class="px-3 py-3 text-gray-500 text-xs">{{ formatTime(order.createdAt) }}</td>
+                <td class="px-3 py-3">
+                  <span class="text-xs px-2 py-0.5 rounded-full"
+                    :class="{
+                      'bg-green-100 text-green-700': order.location === 'restaurant',
+                      'bg-blue-100 text-blue-700':   order.location === 'shop',
+                      'bg-amber-100 text-amber-700':  order.location === 'stall',
+                    }">{{ stationName(order.location) }}</span>
+                </td>
+                <td class="px-3 py-3 text-gray-600 text-xs max-w-[160px] truncate">
+                  {{ order.items.map(i => i.name).join('、') }}
+                </td>
+                <td class="px-3 py-3 text-gray-500 text-xs">{{ PAY_LABEL[order.payMethod] }}</td>
+                <td class="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{{ order.cashierName || '—' }}</td>
+                <td class="px-3 py-3 text-xs whitespace-nowrap">
+                  <template v-if="orderInv(order)">
+                    <span class="font-mono text-gray-700">{{ orderInv(order)!.no }}</span>
+                    <span class="ml-1 px-1.5 py-0.5 rounded" :class="orderInv(order)!.cls">{{ orderInv(order)!.label }}</span>
+                  </template>
+                  <span v-else class="text-gray-300">—</span>
+                </td>
+                <td class="px-5 py-3 text-right font-bold text-gray-900">${{ order.total.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

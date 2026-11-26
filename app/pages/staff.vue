@@ -1,11 +1,11 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 gap-3">
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">員工管理</h1>
         <p class="text-xs text-gray-400 mt-0.5">結帳員工折扣時會要求選擇員工；共 {{ employees.length }} 人，在職 {{ activeCount }} 人</p>
       </div>
-      <div class="flex gap-2 shrink-0">
+      <div class="flex flex-wrap gap-2">
         <button @click="openImport" class="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
           匯入 Excel
         </button>
@@ -15,21 +15,21 @@
       </div>
     </div>
 
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
       <!-- 部門 -->
-      <aside class="w-56 shrink-0 border-r border-gray-200 bg-white overflow-y-auto py-2">
+      <aside class="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-gray-200 bg-white flex md:block overflow-x-auto md:overflow-x-hidden md:overflow-y-auto px-2 md:px-0 py-2 gap-1">
         <button v-for="d in deptTabs" :key="d.key" @click="curDept = d.key"
-          class="w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors"
+          class="shrink-0 md:w-full flex items-center justify-between px-3 md:px-4 py-2 text-sm text-left transition-colors rounded-lg md:rounded-none whitespace-nowrap"
           :class="curDept === d.key ? 'bg-green-50 text-green-800 font-medium' : 'text-gray-600 hover:bg-gray-50'">
           <span class="truncate">{{ d.label }}</span>
           <span class="text-xs text-gray-400 ml-2 shrink-0">{{ d.count }}</span>
         </button>
       </aside>
 
-      <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-6 pt-4 pb-2 flex items-center gap-3 flex-wrap">
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div class="px-4 md:px-6 pt-4 pb-2 flex items-center gap-3 flex-wrap">
           <input v-model="search" type="text" placeholder="搜尋員工編號、姓名"
-            class="w-64 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-green-500 bg-white text-gray-900">
+            class="w-full sm:w-64 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-green-500 bg-white text-gray-900">
           <label class="flex items-center gap-1.5 text-sm text-gray-500">
             <input v-model="showDisabled" type="checkbox"> 顯示停用的員工
           </label>
@@ -38,7 +38,7 @@
             class="ml-auto text-xs text-blue-500 hover:underline">部門改名</button>
         </div>
 
-        <div class="flex-1 overflow-auto px-6 pb-4">
+        <div class="flex-1 overflow-auto px-4 md:px-6 pb-4">
           <table class="w-full text-sm">
             <thead class="sticky top-0 bg-gray-50">
               <tr class="text-xs text-gray-400 border-b border-gray-200">

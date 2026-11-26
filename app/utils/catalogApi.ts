@@ -80,7 +80,8 @@ export const catalogUploadImage = (productId: number, jpg: Blob) =>
 // 要用 hubFetch 拿回來轉成 blob: 網址（同一張只抓一次）。<CatalogImg> 元件會處理。
 export function catalogImageUrl(file: string | undefined, thumb = true) {
   if (!file) return ''
-  try { return `${base()}/catalog/${thumb ? 'thumb' : 'image'}/${encodeURIComponent(file)}` } catch { return '' }
+  // ?v=640：print-agent 1.11 縮圖改成 640 寬，換網址讓瀏覽器不要用快取裡的舊糊圖
+  try { return `${base()}/catalog/${thumb ? 'thumb' : 'image'}/${encodeURIComponent(file)}${thumb ? '?v=640' : ''}` } catch { return '' }
 }
 
 const blobCache = new Map<string, Promise<string>>()
@@ -91,7 +92,7 @@ export function catalogImageSrc(file: string | undefined, thumb = true): Promise
   const key = (thumb ? 'thumb/' : 'image/') + file
   let p = blobCache.get(key)
   if (!p) {
-    p = hubFetch(`catalog/${key.split('/')[0]}/${encodeURIComponent(file)}`)
+    p = hubFetch(`catalog/${key.split('/')[0]}/${encodeURIComponent(file)}${thumb ? '?v=640' : ''}`)
       .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob() })
       .then(b => URL.createObjectURL(b))
     p.catch(() => blobCache.delete(key))

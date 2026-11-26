@@ -38,7 +38,7 @@ export function useCatalog() {
     store.categories.value = (d.categories || []).map(c => ({ id: String(c.id), name: c.name, sortOrder: Number(c.sortOrder) || 0 }))
     store.products.value = d.products.map((p): Product => ({
       id: p.id, name: p.name, price: Number(p.price) || 0, category: p.category || '', note: p.note || '',
-      cashOnly: !!p.cashOnly, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
+      cashOnly: !!p.cashOnly, openPrice: !!p.openPrice, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
       materials: (p.materials || []).map((m: any) => ({ materialId: m.materialId, quantity: Number(m.quantity) || 0 })),
       image: p.image || '',
     }))

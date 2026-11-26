@@ -39,7 +39,8 @@
                         class="w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
           </div>
           <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
-          <div class="flex items-baseline gap-1.5">
+          <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
+          <div v-else class="flex items-baseline gap-1.5">
             <div class="text-base font-bold text-green-700">${{ discountedPrice(prod.price) }}</div>
             <div v-if="curDiscount && curDiscount.rate < 1" class="text-xs text-gray-400 line-through">${{ prod.price }}</div>
           </div>
@@ -112,12 +113,13 @@
           <span class="text-4xl">🛒</span>
           <span class="text-sm">尚未選擇品項</span>
         </div>
-        <div v-for="(item, i) in cart" :key="item.productId" class="flex items-center gap-2 py-2.5 border-b border-gray-100 last:border-0">
+        <div v-for="(item, i) in cart" :key="item.productId + '@' + item.price" class="flex items-center gap-2 py-2.5 border-b border-gray-100 last:border-0">
           <div class="flex-1 min-w-0">
             <div class="text-sm text-gray-900 font-medium truncate">{{ item.name }}</div>
             <div class="flex items-baseline gap-1 text-xs text-gray-400">
               <span v-if="curDiscount && curDiscount.rate < 1" class="line-through">${{ item.price }}</span>
               <span class="text-green-600 font-medium">${{ item.finalPrice }}</span>
+              <button v-if="item.openPrice" @click="editItemPrice(i)" class="ml-1 text-orange-600 hover:underline py-1">改價</button>
             </div>
           </div>
           <div class="flex items-center gap-1">
@@ -259,10 +261,12 @@
             <h2 class="text-xl font-bold text-gray-900 mb-1">請和客人確認品項與數量</h2>
             <p class="text-sm text-gray-500 mb-4">數量可在這裡改；要加別的商品請按「上一步」。</p>
             <div class="bg-white rounded-2xl border border-gray-200 px-4 mb-4">
-              <div v-for="(item, i) in cart" :key="item.productId" class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+              <div v-for="(item, i) in cart" :key="item.productId + '@' + item.price" class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
                 <div class="flex-1 min-w-0">
                   <div class="text-base text-gray-900 font-medium">{{ item.name }}</div>
-                  <div class="text-sm text-gray-400">單價 ${{ item.finalPrice }}</div>
+                  <div class="text-sm text-gray-400">單價 ${{ item.finalPrice }}
+                    <button v-if="item.openPrice" @click="editItemPrice(i)" class="ml-2 text-orange-600 hover:underline">改價</button>
+                  </div>
                 </div>
                 <button @click="guidedQty(i, -1)" class="w-10 h-10 rounded-full border border-gray-200 text-gray-600 text-xl hover:bg-gray-100">−</button>
                 <span class="w-8 text-center text-lg font-bold">{{ item.qty }}</span>
@@ -502,6 +506,34 @@
     </div>
 
     <!-- 載具 Modal -->
+    <!-- 時價品項：輸入當次售價（手機用下面的數字鍵，電腦可直接打數字按 Enter） -->
+    <div v-if="priceModal.open" class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center" @click.self="closePriceModal">
+      <div class="bg-white rounded-t-2xl sm:rounded-2xl p-5 w-full sm:w-80 shadow-2xl">
+        <h3 class="text-base font-bold text-gray-900">{{ priceModal.name }}</h3>
+        <p class="text-xs text-gray-500 mb-3">時價品項，請輸入這次的售價{{ priceModal.editIdx >= 0 ? '（修改）' : '' }}</p>
+        <div class="flex items-center border-2 rounded-xl px-4 py-2 mb-1" :class="priceModal.error ? 'border-red-400' : 'border-orange-400'">
+          <span class="text-2xl text-gray-400 mr-1">$</span>
+          <input ref="priceInput" v-model="priceModal.value" type="text" inputmode="numeric" maxlength="7"
+                 class="flex-1 min-w-0 text-3xl font-bold text-gray-900 text-right outline-none bg-transparent"
+                 placeholder="0" @input="priceModal.error = ''" @keydown.enter.prevent="confirmPrice" @keydown.esc="closePriceModal">
+        </div>
+        <p class="text-xs h-4 mb-2" :class="priceModal.error ? 'text-red-600' : 'text-gray-400'">
+          {{ priceModal.error || (curDiscount && curDiscount.rate < 1 ? `${curDiscount.label} 折扣後 $${discountedPrice(Number(priceModal.value) || 0)}` : '') }}
+        </p>
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <button v-for="k in PRICE_KEYS" :key="k" @click="pricePad(k)"
+                  class="py-3 rounded-xl border border-gray-200 text-xl font-semibold hover:bg-gray-50 active:bg-gray-100"
+                  :class="k === 'C' ? 'text-red-500' : 'text-gray-800'">{{ k }}</button>
+        </div>
+        <div class="flex gap-2">
+          <button @click="closePriceModal" class="flex-1 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">取消</button>
+          <button @click="confirmPrice" class="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
+            {{ priceModal.editIdx >= 0 ? '確定改價' : '加入訂單' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showCarrierModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showCarrierModal = false">
       <div class="bg-white rounded-2xl p-7 w-80 shadow-2xl">
         <h3 class="text-base font-bold text-gray-900 mb-1">統一發票</h3>
@@ -557,7 +589,7 @@
             </tr>
             </thead>
             <tbody>
-            <tr v-for="item in lastOrder.items" :key="item.productId" class="border-b border-gray-100">
+            <tr v-for="item in lastOrder.items" :key="item.productId + '@' + item.price" class="border-b border-gray-100">
               <td class="py-1.5 text-gray-800">{{ item.name }}</td>
               <td class="text-center text-gray-600">{{ item.qty }}</td>
               <td class="text-right text-gray-800">${{ item.finalPrice * item.qty }}</td>
@@ -790,15 +822,56 @@
 
   function addItem(prod: Product) {
     if (prod.cashOnly && curPay.value !== 'cash') curPay.value = 'cash'
-    const ex = cart.value.find(i => i.productId === prod.id)
-    if (ex) { ex.qty++; return }
+    if (prod.openPrice) { openPriceModal(prod.id, prod.name, prod.price, -1); return }
+    pushItem(prod, prod.price)
+  }
+  // 同品項同價錢就加數量；時價品項不同價錢分開列
+  function pushItem(prod: { id: number; name: string; openPrice?: boolean }, price: number, qty = 1) {
+    const ex = cart.value.find(i => i.productId === prod.id && i.price === price)
+    if (ex) { ex.qty += qty; return }
     cart.value.push({
       productId: prod.id,
       name: prod.name,
-      price: prod.price,
-      finalPrice: discountedPrice(prod.price),
-      qty: 1,
+      price,
+      finalPrice: discountedPrice(price),
+      qty,
+      ...(prod.openPrice ? { openPrice: true } : {}),
     })
+  }
+
+  // 時價：輸入當次售價
+  const PRICE_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫']
+  const priceInput = ref<HTMLInputElement | null>(null)
+  const priceModal = reactive({ open: false, productId: 0, name: '', value: '', editIdx: -1, error: '' })
+  function openPriceModal(productId: number, name: string, price: number, editIdx: number) {
+    Object.assign(priceModal, { open: true, productId, name, value: price > 0 ? String(price) : '', editIdx, error: '' })
+    nextTick(() => { priceInput.value?.focus(); priceInput.value?.select() })
+  }
+  function closePriceModal() { priceModal.open = false }
+  function pricePad(k: string) {
+    priceModal.error = ''
+    if (k === 'C') priceModal.value = ''
+    else if (k === '⌫') priceModal.value = priceModal.value.slice(0, -1)
+    else if (priceModal.value.length < 7) priceModal.value = (priceModal.value === '0' ? '' : priceModal.value) + k
+  }
+  function confirmPrice() {
+    const txt = String(priceModal.value).trim()
+    const price = Number(txt)
+    if (!/^\d+$/.test(txt) || price <= 0) { priceModal.error = '請輸入大於 0 的整數金額'; return }
+    if (priceModal.editIdx >= 0) {
+      const item = cart.value[priceModal.editIdx]
+      if (item) {
+        cart.value.splice(priceModal.editIdx, 1)
+        pushItem({ id: item.productId, name: item.name, openPrice: true }, price, item.qty) // 改成跟別行同價錢時合併
+      }
+    } else {
+      pushItem({ id: priceModal.productId, name: priceModal.name, openPrice: true }, price)
+    }
+    priceModal.open = false
+  }
+  function editItemPrice(idx: number) {
+    const item = cart.value[idx]
+    if (item?.openPrice) openPriceModal(item.productId, item.name, item.price, idx)
   }
 
   const locProducts = computed(() =>
@@ -816,7 +889,7 @@
   const subtotal = computed(() => cart.value.reduce((s, i) => s + i.price * i.qty, 0))
   const total    = computed(() => cart.value.reduce((s, i) => s + i.finalPrice * i.qty, 0))
 
-  function cartQty(id: number) { return cart.value.find(i => i.productId === id)?.qty ?? 0 }
+  function cartQty(id: number) { return cart.value.filter(i => i.productId === id).reduce((s, i) => s + i.qty, 0) }
   function changeQty(idx: number, d: number) {
     cart.value[idx].qty += d
     if (cart.value[idx].qty <= 0) cart.value.splice(idx, 1)

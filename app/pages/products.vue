@@ -3,9 +3,31 @@
 
     <!-- 頁頭 -->
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
-      <div>
-        <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
-        <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div>
+          <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
+          <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
+        </div>
+        <!-- 篩選：地點、分類（下拉選單） -->
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex items-center gap-1.5 text-xs text-gray-500">
+            地點
+            <select v-model="filterLoc" class="ifield" style="width:auto; min-width:7rem">
+              <option v-for="loc in filterOptions" :key="loc.value" :value="loc.value">{{ loc.label }}</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-1.5 text-xs text-gray-500">
+            分類
+            <select v-model="filterCat" class="ifield" style="width:auto; min-width:7rem">
+              <option value="">全部</option>
+              <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
+              <option :value="NO_CAT">（未分類）</option>
+            </select>
+          </label>
+          <span class="text-xs text-gray-400">共 {{ filteredProducts.length }} 項</span>
+        </div>
+        <span v-if="catState.mode === 'demo'" class="text-xs text-amber-600">範例模式：連不到資料機，修改不會保存</span>
+        <span v-else-if="catState.offline" class="text-xs text-amber-600">平板離線中，不能修改品項</span>
       </div>
       <div class="flex flex-wrap gap-2">
         <button @click="openCats" class="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
@@ -15,22 +37,6 @@
           ＋ 新增品項
         </button>
       </div>
-    </div>
-
-    <!-- 篩選 -->
-    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-2.5 flex gap-2 overflow-x-auto shrink-0">
-      <button
-        v-for="loc in filterOptions" :key="loc.value"
-        @click="filterLoc = loc.value"
-        class="px-4 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors"
-        :class="filterLoc === loc.value
-          ? 'bg-gray-100 text-gray-900 border-gray-400 font-medium'
-          : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-      >
-        {{ loc.label }}
-      </button>
-      <span v-if="catState.mode === 'demo'" class="ml-auto self-center text-xs text-amber-600 whitespace-nowrap">範例模式：連不到資料機，修改不會保存</span>
-      <span v-else-if="catState.offline" class="ml-auto self-center text-xs text-amber-600 whitespace-nowrap">平板離線中，不能修改品項</span>
     </div>
 
     <!-- 表格 -->
@@ -67,7 +73,13 @@
               <span v-if="prod.category" class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{{ prod.category }}</span>
               <span v-else class="text-gray-300">—</span>
             </td>
-            <td class="py-3 text-right font-semibold text-green-700">${{ prod.price }}</td>
+            <td class="py-3 text-right font-semibold text-green-700 whitespace-nowrap">
+              <template v-if="prod.openPrice">
+                <span class="text-orange-600">時價</span>
+                <div v-if="prod.price" class="text-xs font-normal text-gray-400">參考 ${{ prod.price }}</div>
+              </template>
+              <template v-else>${{ prod.price }}</template>
+            </td>
             <td class="py-3 text-center">
               <span v-if="prod.cashOnly" class="text-amber-500 text-base" title="限現金">💵</span>
               <span v-else class="text-gray-200">—</span>
@@ -128,104 +140,120 @@
 
     <!-- 新增/編輯 Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showModal = false">
-      <div class="bg-white rounded-2xl p-7 w-[480px] max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div class="bg-white rounded-2xl p-5 sm:p-7 w-[480px] lg:w-[900px] max-w-[95vw] max-h-[90vh] overflow-y-auto shadow-2xl">
         <h3 class="text-base font-bold text-gray-900 mb-5">{{ editId ? '編輯品項' : '新增品項' }}</h3>
 
-        <div class="space-y-4">
-          <p v-if="formError" class="text-xs text-red-600">{{ formError }}</p>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-gray-500 mb-1 block">品項名稱 *</label>
-              <input v-model="form.name" type="text" class="ifield" placeholder="例：巧克力餅乾一盒">
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 mb-1 block">售價 *</label>
-              <input v-model.number="form.price" type="number" class="ifield" placeholder="0">
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-gray-500 mb-1 block">分類</label>
-              <div v-if="!quickCat.open" class="flex gap-1.5 items-center">
-                <select v-model="form.category" class="ifield" style="flex:1; min-width:0">
-                  <option value="">（未分類）</option>
-                  <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
-                </select>
-                <button @click="quickCat.open = true; quickCat.name = ''; quickCat.error = ''" class="text-xs text-green-600 hover:underline whitespace-nowrap" title="新增分類">＋新增</button>
+        <p v-if="formError" class="text-xs text-red-600 mb-3">{{ formError }}</p>
+        <!-- 夠寬（lg 以上）時分左右兩欄：左邊基本資料與售價設定，右邊圖片、站別、物料；窄螢幕和手機維持單欄 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">品項名稱 *</label>
+                <input v-model="form.name" type="text" class="ifield" placeholder="例：巧克力餅乾一盒">
               </div>
-              <div v-else class="flex gap-1.5 items-center">
-                <input v-model="quickCat.name" type="text" class="ifield" style="min-width:0" placeholder="新分類名稱" @keyup.enter="addQuickCat">
-                <button @click="addQuickCat" :disabled="quickCat.saving" class="text-xs text-green-600 hover:underline whitespace-nowrap">確定</button>
-                <button @click="quickCat.open = false" class="text-xs text-gray-400 hover:underline whitespace-nowrap">取消</button>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">{{ form.openPrice ? '參考售價（選填）' : '售價 *' }}</label>
+                <input v-model.number="form.price" type="number" class="ifield" :placeholder="form.openPrice ? '結帳時再輸入' : '0'">
               </div>
-              <p v-if="quickCat.error" class="text-xs text-red-600 mt-1">{{ quickCat.error }}</p>
             </div>
-            <div>
-              <label class="text-xs text-gray-500 mb-1 block">備註</label>
-              <input v-model="form.note" type="text" class="ifield" placeholder="例：30入">
-            </div>
-          </div>
 
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">圖片（存在資料機，收銀台卡片會顯示）</label>
-            <div class="flex items-center gap-3">
-              <img v-if="imageFile && imagePreview" :src="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100">
-              <CatalogImg v-else-if="imagePreview" :file="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100" />
-              <div v-else class="w-20 h-15 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-xs text-gray-300">無圖片</div>
-              <label class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
-                選擇圖片
-                <input type="file" accept="image/*" class="hidden" @change="pickImage">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">分類</label>
+                <div v-if="!quickCat.open" class="flex gap-1.5 items-center">
+                  <select v-model="form.category" class="ifield" style="flex:1; min-width:0">
+                    <option value="">（未分類）</option>
+                    <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
+                  </select>
+                  <button @click="quickCat.open = true; quickCat.name = ''; quickCat.error = ''" class="text-xs text-green-600 hover:underline whitespace-nowrap" title="新增分類">＋新增</button>
+                </div>
+                <div v-else class="flex gap-1.5 items-center">
+                  <input v-model="quickCat.name" type="text" class="ifield" style="min-width:0" placeholder="新分類名稱" @keyup.enter="addQuickCat">
+                  <button @click="addQuickCat" :disabled="quickCat.saving" class="text-xs text-green-600 hover:underline whitespace-nowrap">確定</button>
+                  <button @click="quickCat.open = false" class="text-xs text-gray-400 hover:underline whitespace-nowrap">取消</button>
+                </div>
+                <p v-if="quickCat.error" class="text-xs text-red-600 mt-1">{{ quickCat.error }}</p>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">備註</label>
+                <input v-model="form.note" type="text" class="ifield" placeholder="例：30入">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-500 mb-2 block">售價方式</label>
+              <label class="flex items-center gap-2 cursor-pointer w-fit">
+                <input type="checkbox" v-model="form.openPrice" class="w-4 h-4 accent-orange-500">
+                <span class="text-sm text-gray-700">✏️ 時價／自訂價錢（結帳時輸入售價）</span>
               </label>
-              <button v-if="imagePreview" @click="removeImage" class="text-xs text-red-400 hover:underline">移除</button>
+              <p class="text-xs text-gray-400 mt-1 ml-6">勾選後收銀點這個品項會跳出輸入金額；上面的售價只當預設值，可留 0</p>
             </div>
-          </div>
 
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">上架站別（可多選）</label>
-            <div class="flex flex-wrap gap-x-4 gap-y-2">
-              <label v-for="loc in locationOptions" :key="loc.value" class="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" :value="loc.value" v-model="form.locations" class="w-4 h-4 accent-green-600">
-                <span class="text-sm text-gray-700">{{ loc.label }}</span>
+            <div>
+              <label class="text-xs text-gray-500 mb-2 block">付款限制</label>
+              <label class="flex items-center gap-2 cursor-pointer w-fit">
+                <input type="checkbox" v-model="form.cashOnly" class="w-4 h-4 accent-amber-500">
+                <span class="text-sm text-gray-700">💵 限制只能使用現金付款</span>
               </label>
+              <p class="text-xs text-gray-400 mt-1 ml-6">勾選後結帳時將鎖定付款方式為現金（例：午餐餐券）</p>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">排列順序</label>
+              <input v-model.number="form.sortOrder" type="number" min="1" class="ifield w-24">
             </div>
           </div>
 
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">付款限制</label>
-            <label class="flex items-center gap-2 cursor-pointer w-fit">
-              <input type="checkbox" v-model="form.cashOnly" class="w-4 h-4 accent-amber-500">
-              <span class="text-sm text-gray-700">💵 限制只能使用現金付款</span>
-            </label>
-            <p class="text-xs text-gray-400 mt-1 ml-6">勾選後結帳時將鎖定付款方式為現金（例：午餐餐券）</p>
-          </div>
-
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">消耗物料（選填）</label>
-            <div class="space-y-2">
-              <div v-for="(pm, i) in form.materials" :key="i" class="flex gap-2 items-center">
-                <select
-                  v-model.number="pm.materialId"
-                  style="flex:1; min-width:0; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; background:#fff; color:#111; outline:none;"
-                >
-                  <option :value="0" disabled>請選擇物料</option>
-                  <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.unit }}）</option>
-                </select>
-                <input
-                  v-model.number="pm.quantity"
-                  type="number" min="1"
-                  placeholder="數量"
-                  style="width:72px; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; outline:none;"
-                >
-                <button @click="form.materials.splice(i, 1)" class="text-red-400 hover:text-red-600 text-xl leading-none px-1">×</button>
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">圖片（存在資料機，收銀台卡片會顯示）</label>
+              <p class="text-xs text-gray-400 mb-2">建議比例 <b class="text-gray-600">4:3 橫式</b>，建議尺寸 <b class="text-gray-600">1200×900 px</b>（最小 800×600）。其他比例會在收銀卡片上自動裁掉上下或左右，主體請放中間。</p>
+              <div class="flex items-center gap-3">
+                <img v-if="imageFile && imagePreview" :src="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100">
+                <CatalogImg v-else-if="imagePreview" :file="imagePreview" alt="品項圖片" class="w-20 h-15 object-cover rounded-lg bg-gray-100" />
+                <div v-else class="w-20 h-15 rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-xs text-gray-300">無圖片</div>
+                <label class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
+                  選擇圖片
+                  <input type="file" accept="image/*" class="hidden" @change="pickImage">
+                </label>
+                <button v-if="imagePreview" @click="removeImage" class="text-xs text-red-400 hover:underline">移除</button>
               </div>
-              <button @click="form.materials.push({ materialId: 0, quantity: 1 })" class="text-xs text-green-600 hover:underline mt-1">＋ 新增物料</button>
+              <p v-if="imageInfo" class="text-xs mt-1.5" :class="imageInfo.warn ? 'text-amber-600' : 'text-green-600'">{{ imageInfo.text }}</p>
             </div>
-          </div>
 
-          <div>
-            <label class="text-xs text-gray-500 mb-1 block">排列順序</label>
-            <input v-model.number="form.sortOrder" type="number" min="1" class="ifield w-24">
+            <div>
+              <label class="text-xs text-gray-500 mb-2 block">上架站別（可多選）</label>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                <label v-for="loc in locationOptions" :key="loc.value" class="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" :value="loc.value" v-model="form.locations" class="w-4 h-4 accent-green-600">
+                  <span class="text-sm text-gray-700">{{ loc.label }}</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-500 mb-2 block">消耗物料（選填）</label>
+              <div class="space-y-2">
+                <div v-for="(pm, i) in form.materials" :key="i" class="flex gap-2 items-center">
+                  <select
+                    v-model.number="pm.materialId"
+                    style="flex:1; min-width:0; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; background:#fff; color:#111; outline:none;"
+                  >
+                    <option :value="0" disabled>請選擇物料</option>
+                    <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}（{{ m.unit }}）</option>
+                  </select>
+                  <input
+                    v-model.number="pm.quantity"
+                    type="number" min="1"
+                    placeholder="數量"
+                    style="width:72px; border:1px solid #e5e7eb; border-radius:8px; padding:7px 10px; font-size:13px; outline:none;"
+                  >
+                  <button @click="form.materials.splice(i, 1)" class="text-red-400 hover:text-red-600 text-xl leading-none px-1">×</button>
+                </div>
+                <button @click="form.materials.push({ materialId: 0, quantity: 1 })" class="text-xs text-green-600 hover:underline mt-1">＋ 新增物料</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -247,6 +275,8 @@ const cat = useCatalog()
 const catState = cat.state
 
 const filterLoc = ref('')   // '' = 全部，其他 = 站別 id
+const filterCat = ref('')   // '' = 全部，NO_CAT = 未分類，其他 = 分類名稱
+const NO_CAT = '\u0000none'
 const showModal = ref(false)
 const editId    = ref<number | null>(null)
 const saving    = ref(false)
@@ -264,6 +294,7 @@ function locColor(id: string) {
 const defaultForm = () => ({
   name: '', price: 0, category: '', note: '',
   cashOnly: false,
+  openPrice: false,
   locations: [] as string[],
   sortOrder: products.value.length + 1,
   materials: [] as { materialId: number; quantity: number }[],
@@ -282,8 +313,28 @@ function pickImage(e: Event) {
   imageFile.value = f
   imageRemoved.value = false
   imagePreview.value = URL.createObjectURL(f)
+  checkImageSize(imagePreview.value)
+}
+
+// 選圖後檢查比例和大小（收銀卡片是 4:3），提醒會被裁切或太小
+const imageInfo = ref<{ text: string; warn: boolean } | null>(null)
+function checkImageSize(url: string) {
+  imageInfo.value = null
+  const img = new Image()
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight
+    if (!w || !h) return
+    const r = w / h
+    const size = `這張 ${w}×${h} px`
+    if (w < 800 || h < 600) imageInfo.value = { text: `${size}，有點小，收銀卡片可能會模糊（建議至少 800×600）`, warn: true }
+    else if (r > 4 / 3 * 1.1) imageInfo.value = { text: `${size}，比 4:3 寬，卡片會裁掉左右兩邊`, warn: true }
+    else if (r < 4 / 3 / 1.1) imageInfo.value = { text: `${size}，比 4:3 高，卡片會裁掉上下`, warn: true }
+    else imageInfo.value = { text: `${size}，比例 OK`, warn: false }
+  }
+  img.src = url
 }
 function removeImage() {
+  imageInfo.value = null
   imageFile.value = null
   imageRemoved.value = true
   imagePreview.value = ''
@@ -292,6 +343,7 @@ function removeImage() {
 const filteredProducts = computed(() =>
   products.value
     .filter(p => !filterLoc.value || p.locations.includes(filterLoc.value))
+    .filter(p => !filterCat.value || (filterCat.value === NO_CAT ? !(p.category || '').trim() : p.category === filterCat.value))
     .sort((a, b) => a.sortOrder - b.sortOrder)
 )
 
@@ -300,6 +352,7 @@ function getMaterialName(id: number) {
 }
 
 function resetImage(prod?: Product) {
+  imageInfo.value = null
   imageFile.value = null
   imageRemoved.value = false
   imagePreview.value = prod?.image ?? ''  // 檔名；<CatalogImg> 負責取圖
@@ -310,6 +363,7 @@ function openAdd() {
   form.value = defaultForm()
   // 新增時預設勾目前篩選的站
   if (filterLoc.value) form.value.locations = [filterLoc.value]
+  if (filterCat.value && filterCat.value !== NO_CAT) form.value.category = filterCat.value
   resetImage()
   formError.value = ''
   quickCat.open = false
@@ -321,7 +375,7 @@ function openEdit(prod: Product) {
   editId.value = prod.id
   form.value = {
     name: prod.name, price: prod.price, category: prod.category,
-    note: prod.note, cashOnly: prod.cashOnly,
+    note: prod.note, cashOnly: prod.cashOnly, openPrice: !!prod.openPrice,
     locations: [...prod.locations],
     sortOrder: prod.sortOrder,
     materials: prod.materials.map(m => ({ ...m })),
@@ -334,7 +388,8 @@ function openEdit(prod: Product) {
 }
 
 async function saveProduct() {
-  if (!form.value.name || !form.value.price) { formError.value = '請填品項名稱和售價'; return }
+  if (!form.value.name || (!form.value.price && !form.value.openPrice)) { formError.value = '請填品項名稱和售價（時價品項可不填售價）'; return }
+  if (form.value.price < 0) { formError.value = '售價不能是負數'; return }
   saving.value = true
   formError.value = ''
   try {

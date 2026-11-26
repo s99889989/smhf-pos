@@ -1,5 +1,5 @@
 // 圖片上傳前處理（照農莊系統 holy-mother-farm app/utils/imageUpload.js 的 prepareImage 精簡）：
-// 轉正、縮到寬 1200、壓成 JPEG 0.82；透明底補白；讀不了（HEIC 等）就提示改格式。
+// 轉正、縮到寬 1200、壓成 JPEG 0.9；透明底補白；讀不了（HEIC 等）就提示改格式。
 // 收銀這邊上傳到資料機的 print-agent，不經雲端，所以不需要大小重試與除錯報告。
 
 const isHeic = (f: File) => /image\/hei[cf]/i.test(f.type || '') || /\.(heic|heif)$/i.test(f.name || '')
@@ -28,7 +28,7 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
   }
 }
 
-export async function prepareImage(file: File, maxWidth = 1200, quality = 0.82): Promise<Blob> {
+export async function prepareImage(file: File, maxWidth = 1200, quality = 0.9): Promise<Blob> {
   const d = await decode(file)
   try {
     const scale = Math.min(1, maxWidth / d.width, Math.sqrt(16_600_000 / (d.width * d.height)))

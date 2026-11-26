@@ -42,6 +42,7 @@ export interface Product {
   category: string
   note: string
   cashOnly: boolean
+  openPrice?: boolean   // 時價：結帳點這個品項時輸入當次售價（price 只當預設參考價）
   locations: string[]   // 上架在哪幾個收銀站（站別 id，見 stations；後台可自訂）
   sortOrder: number
   materials: ProductMaterial[]
@@ -68,6 +69,7 @@ export interface OrderItem {
   price: number
   finalPrice: number
   qty: number
+  openPrice?: boolean   // 時價品項：price 是收銀當次輸入的金額
 }
 
 export interface Order {

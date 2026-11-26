@@ -55,6 +55,13 @@ export interface StationDef {
   sortOrder: number
 }
 
+// 品項分類（午餐、飲品…），存在資料機，可在品項管理新增、改名、刪除；品項上存的是分類名稱
+export interface CategoryDef {
+  id: string
+  name: string
+  sortOrder: number
+}
+
 export interface OrderItem {
   productId: number
   name: string
@@ -225,6 +232,19 @@ export function usePosStore() {
     return stations.value.find(s => s.id === id)?.name ?? LOC_LABEL[id] ?? id
   }
 
+  // 分類清單：資料機載入後換成資料機的清單（useCatalog）。
+  // 畫面用 categoryList：清單依順序，再補上品項有用到、清單裡卻沒有的分類（舊版 print-agent / 範例模式）
+  const categories = useState<CategoryDef[]>('categories', () => [])
+  const categoryList = computed<CategoryDef[]>(() => {
+    const list = [...categories.value].sort((a, b) => a.sortOrder - b.sortOrder)
+    const names = new Set(list.map(c => c.name))
+    for (const p of [...products.value].sort((a, b) => a.sortOrder - b.sortOrder)) {
+      const n = (p.category || '').trim()
+      if (n && !names.has(n)) { names.add(n); list.push({ id: '', name: n, sortOrder: list.length + 1 }) }
+    }
+    return list
+  })
+
   // 連得到資料機時，庫存異動寫到資料機（useCatalog）；範例模式才在這裡直接改
   function catalogFailed(e: unknown) {
     alert('寫入資料機失敗：' + ((e as Error)?.message ?? e))
@@ -326,6 +346,7 @@ export function usePosStore() {
     internalUses, addInternalUse,
     products, orders, addOrder,
     stations, stationName,
+    categories, categoryList,
     shopOrders, addShopOrder,
   }
 }

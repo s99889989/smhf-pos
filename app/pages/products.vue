@@ -7,9 +7,14 @@
         <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
         <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
       </div>
-      <button @click="openAdd" class="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
-        ＋ 新增品項
-      </button>
+      <div class="flex gap-2">
+        <button @click="openCats" class="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+          分類管理
+        </button>
+        <button @click="openAdd" class="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+          ＋ 新增品項
+        </button>
+      </div>
     </div>
 
     <!-- 篩選 -->
@@ -59,7 +64,8 @@
               <div v-if="prod.note" class="text-xs text-gray-400">{{ prod.note }}</div>
             </td>
             <td class="py-3">
-              <span class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{{ prod.category }}</span>
+              <span v-if="prod.category" class="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{{ prod.category }}</span>
+              <span v-else class="text-gray-300">—</span>
             </td>
             <td class="py-3 text-right font-semibold text-green-700">${{ prod.price }}</td>
             <td class="py-3 text-center">
@@ -90,6 +96,36 @@
       </table>
     </div>
 
+    <!-- 分類管理 Modal -->
+    <div v-if="showCats" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showCats = false">
+      <div class="bg-white rounded-2xl p-7 w-[440px] max-h-[90vh] overflow-y-auto shadow-2xl">
+        <h3 class="text-base font-bold text-gray-900 mb-1">分類管理</h3>
+        <p class="text-xs text-gray-400 mb-4">收銀台的分類頁籤依這裡的順序排列；改名時，用這個分類的品項會一起改。</p>
+        <p v-if="catError" class="text-xs text-red-600 mb-3">{{ catError }}</p>
+
+        <div class="space-y-2">
+          <div v-for="(c, i) in catRows" :key="c.key" class="flex gap-2 items-center">
+            <div class="flex flex-col leading-none">
+              <button @click="moveCat(i, -1)" :disabled="i === 0 || catBusy" class="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="往上">▲</button>
+              <button @click="moveCat(i, 1)" :disabled="i === catRows.length - 1 || catBusy" class="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="往下">▼</button>
+            </div>
+            <input v-model="c.name" type="text" class="ifield" style="flex:1; min-width:0" @keyup.enter="renameCat(c)">
+            <span class="text-xs text-gray-400 whitespace-nowrap w-14 text-right">{{ productCount(c.orig) }} 個品項</span>
+            <button v-if="c.name.trim() !== c.orig" @click="renameCat(c)" :disabled="catBusy" class="text-xs text-blue-500 hover:underline whitespace-nowrap">儲存</button>
+            <button v-else @click="removeCat(c)" :disabled="catBusy" class="text-xs text-red-400 hover:underline whitespace-nowrap">刪除</button>
+          </div>
+          <p v-if="!catRows.length" class="text-sm text-gray-400">還沒有分類</p>
+        </div>
+
+        <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+          <input v-model="newCatName" type="text" class="ifield" style="flex:1; min-width:0" placeholder="新分類名稱，例：飲品" @keyup.enter="addCat">
+          <button @click="addCat" :disabled="catBusy" class="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 rounded-lg whitespace-nowrap disabled:opacity-60">＋ 新增分類</button>
+        </div>
+
+        <button @click="showCats = false" class="w-full mt-5 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">關閉</button>
+      </div>
+    </div>
+
     <!-- 新增/編輯 Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showModal = false">
       <div class="bg-white rounded-2xl p-7 w-[480px] max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -111,7 +147,19 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-xs text-gray-500 mb-1 block">分類</label>
-              <input v-model="form.category" type="text" class="ifield" placeholder="例：餅乾麵包">
+              <div v-if="!quickCat.open" class="flex gap-1.5 items-center">
+                <select v-model="form.category" class="ifield" style="flex:1; min-width:0">
+                  <option value="">（未分類）</option>
+                  <option v-for="c in categoryList" :key="c.name" :value="c.name">{{ c.name }}</option>
+                </select>
+                <button @click="quickCat.open = true; quickCat.name = ''; quickCat.error = ''" class="text-xs text-green-600 hover:underline whitespace-nowrap" title="新增分類">＋新增</button>
+              </div>
+              <div v-else class="flex gap-1.5 items-center">
+                <input v-model="quickCat.name" type="text" class="ifield" style="min-width:0" placeholder="新分類名稱" @keyup.enter="addQuickCat">
+                <button @click="addQuickCat" :disabled="quickCat.saving" class="text-xs text-green-600 hover:underline whitespace-nowrap">確定</button>
+                <button @click="quickCat.open = false" class="text-xs text-gray-400 hover:underline whitespace-nowrap">取消</button>
+              </div>
+              <p v-if="quickCat.error" class="text-xs text-red-600 mt-1">{{ quickCat.error }}</p>
             </div>
             <div>
               <label class="text-xs text-gray-500 mb-1 block">備註</label>
@@ -194,7 +242,7 @@
 <script setup lang="ts">
 import type { Product } from '~/composables/usePosStore'
 
-const { products, materials, stations, stationName } = usePosStore()
+const { products, materials, stations, stationName, categoryList } = usePosStore()
 const cat = useCatalog()
 const catState = cat.state
 
@@ -264,6 +312,8 @@ function openAdd() {
   if (filterLoc.value) form.value.locations = [filterLoc.value]
   resetImage()
   formError.value = ''
+  quickCat.open = false
+  quickCat.error = ''
   showModal.value = true
 }
 
@@ -278,6 +328,8 @@ function openEdit(prod: Product) {
   }
   resetImage(prod)
   formError.value = ''
+  quickCat.open = false
+  quickCat.error = ''
   showModal.value = true
 }
 
@@ -297,6 +349,93 @@ async function saveProduct() {
   } finally {
     saving.value = false
   }
+}
+
+// ---- 分類 ----
+// 舊版 print-agent 沒有分類 API 時，給看得懂的訊息
+function catMsg(e: unknown) {
+  const m = (e as Error)?.message ?? String(e)
+  return /沒有這個功能/.test(m) ? '資料機的 print-agent 還是舊版，要更新到 1.8 才能管理分類（' + m + '）' : m
+}
+function productCount(name: string) {
+  return name ? products.value.filter(p => p.category === name).length : 0
+}
+
+// 品項編輯視窗裡的「＋新增」：新增後直接選它
+const quickCat = reactive({ open: false, name: '', error: '', saving: false })
+async function addQuickCat() {
+  const name = quickCat.name.trim()
+  if (!name) { quickCat.error = '請輸入分類名稱'; return }
+  quickCat.saving = true
+  quickCat.error = ''
+  try {
+    if (!categoryList.value.some(c => c.name === name)) await cat.saveCategory({ name })
+    form.value.category = name
+    quickCat.open = false
+  } catch (e) {
+    quickCat.error = catMsg(e)
+  } finally {
+    quickCat.saving = false
+  }
+}
+
+// 分類管理視窗
+const showCats   = ref(false)
+const catBusy    = ref(false)
+const catError   = ref('')
+const newCatName = ref('')
+const catRows    = ref<{ key: string; id: string; name: string; orig: string; sortOrder: number }[]>([])
+function refreshCatRows() {
+  catRows.value = categoryList.value.map((c, i) => ({ key: c.id || 'n:' + c.name, id: c.id, name: c.name, orig: c.name, sortOrder: i + 1 }))
+}
+function openCats() {
+  refreshCatRows()
+  catError.value = ''
+  newCatName.value = ''
+  showCats.value = true
+}
+async function runCat(job: () => Promise<void>) {
+  catBusy.value = true
+  catError.value = ''
+  try { await job() } catch (e) { catError.value = catMsg(e) } finally { catBusy.value = false; refreshCatRows() }
+}
+function addCat() {
+  const name = newCatName.value.trim()
+  if (!name) { catError.value = '請輸入分類名稱'; return }
+  runCat(async () => { await cat.saveCategory({ name }); newCatName.value = '' })
+}
+function renameCat(c: { id: string; name: string; orig: string; sortOrder: number }) {
+  const name = c.name.trim()
+  if (!name) { catError.value = '分類名稱不能空白'; return }
+  if (name === c.orig) return
+  // 清單裡還沒有的（舊資料只寫在品項上）：用舊名建一筆再改名，品項才會一起改
+  runCat(async () => {
+    let id = c.id
+    if (!id) { await cat.saveCategory({ name: c.orig }); id = categoryList.value.find(x => x.name === c.orig)?.id || '' }
+    await cat.saveCategory({ id, name, sortOrder: c.sortOrder })
+  })
+}
+function removeCat(c: { id: string; orig: string }) {
+  const n = productCount(c.orig)
+  if (n) { catError.value = `還有 ${n} 個品項是「${c.orig}」，請先把它們改到別的分類再刪`; return }
+  if (!c.id) return
+  if (!confirm(`確定刪除分類「${c.orig}」？`)) return
+  runCat(() => cat.deleteCategory(c.id))
+}
+function moveCat(i: number, d: number) {
+  const rows = catRows.value.slice()
+  const j = i + d
+  if (j < 0 || j >= rows.length) return
+  const t = rows[i]!; rows[i] = rows[j]!; rows[j] = t
+  // 重新編號，只送有變的
+  runCat(async () => {
+    for (let k = 0; k < rows.length; k++) {
+      const r = rows[k]!
+      const cur = categoryList.value.find(x => x.name === r.orig)
+      if (cur && cur.id && cur.sortOrder === k + 1) continue
+      await cat.saveCategory({ id: cur?.id || undefined, name: r.orig, sortOrder: k + 1 })
+    }
+  })
 }
 
 async function deleteProduct(id: number) {

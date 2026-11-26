@@ -612,7 +612,7 @@
   import { buildBillLines, type BillLine, type BillOrder } from '~/utils/billPrint'
   import { useGuidedCheckout, loadGuidedCheckout } from '~/composables/useGuidedCheckout'
 
-  const { products, discountTypes, employees, vipMembers, addOrder, stationName } = usePosStore()
+  const { products, discountTypes, employees, vipMembers, addOrder, stationName, categoryList } = usePosStore()
 
 
   // 商品圖片（資料機上的縮圖，<CatalogImg> 會依區網 / Hub 取圖）；載不到的就只顯示文字
@@ -787,7 +787,12 @@
   const locProducts = computed(() =>
           products.value.filter(p => !curLoc.value || p.locations.includes(curLoc.value)).sort((a, b) => a.sortOrder - b.sortOrder)
   )
-  const categories = computed(() => ['全部', ...new Set(locProducts.value.map(p => p.category || '其他'))])
+  // 分類頁籤：依品項管理裡排的分類順序，只列這站有品項的分類
+  const categories = computed(() => {
+    const used = new Set(locProducts.value.map(p => p.category || '其他'))
+    const ordered = categoryList.value.map(c => c.name).filter(n => used.has(n))
+    return ['全部', ...ordered, ...[...used].filter(n => !ordered.includes(n))]
+  })
   const filteredProducts = computed(() =>
           curCat.value === '全部' ? locProducts.value : locProducts.value.filter(p => (p.category || '其他') === curCat.value)
   )

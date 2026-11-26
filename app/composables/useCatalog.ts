@@ -2,7 +2,7 @@
 // 站別、商品主檔、原料庫存與商品圖片統一存在公司資料機（print-agent Catalog.cs）。
 // 這裡負責：開網頁時載入、各頁面修改時寫回資料機、結帳後扣資料機庫存。
 // 連不到 print-agent（例如開發電腦）時是「範例模式」：用 usePosStore 內建的範例資料，改了只在這個分頁有效。
-import type { Product, Material, StockIn, InternalUse, StationDef } from './usePosStore'
+import type { Product, Material, StockIn, InternalUse, StationDef, CategoryDef } from './usePosStore'
 import { catalogAll, catalogPost, catalogUploadImage, catalogRoute, CatalogError, type CatalogAll } from '~/utils/catalogApi'
 import { prepareImage } from '~/utils/imageUpload'
 
@@ -35,6 +35,7 @@ export function useCatalog() {
 
   function apply(d: CatalogAll) {
     store.stations.value = d.stations.map(s => ({ id: String(s.id), name: s.name, sortOrder: Number(s.sortOrder) || 0 }))
+    store.categories.value = (d.categories || []).map(c => ({ id: String(c.id), name: c.name, sortOrder: Number(c.sortOrder) || 0 }))
     store.products.value = d.products.map((p): Product => ({
       id: p.id, name: p.name, price: Number(p.price) || 0, category: p.category || '', note: p.note || '',
       cashOnly: !!p.cashOnly, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
@@ -106,6 +107,30 @@ export function useCatalog() {
     store.products.value.forEach(p => { p.locations = p.locations.filter(l => l !== id) })
   })
 
+  // ---- 分類 ----
+  // 舊版 print-agent（1.7 以前）沒有分類 API：清單只能從品項推出來，不能另外新增
+  const saveCategory = (c: Partial<CategoryDef> & { name: string }) => mutate('category/save', c, () => {
+    const name = c.name.trim()
+    const list = store.categories.value
+    if (!list.length) store.categories.value = store.categoryList.value.map((x, i) => ({ ...x, id: x.id || 'c' + (i + 1) }))
+    const all = store.categories.value
+    const cur = c.id ? all.find(x => x.id === c.id) : (c.sortOrder != null ? all.find(x => x.name === name) : undefined)
+    if (all.some(x => x.name === name && x !== cur)) throw new Error(`已經有分類「${name}」`)
+    if (cur) {
+      if (cur.name !== name) store.products.value.forEach(p => { if (p.category === cur.name) p.category = name })
+      cur.name = name
+      if (c.sortOrder != null) cur.sortOrder = c.sortOrder
+    } else all.push({ id: 'c' + Date.now(), name, sortOrder: all.length + 1 })
+  })
+  const deleteCategory = (id: string) => mutate('category/delete', { id }, () => {
+    if (!store.categories.value.length) store.categories.value = store.categoryList.value.map((x, i) => ({ ...x, id: x.id || 'c' + (i + 1) }))
+    const c = store.categories.value.find(x => x.id === id)
+    if (!c) return
+    const n = store.products.value.filter(p => p.category === c.name).length
+    if (n) throw new Error(`還有 ${n} 個品項是「${c.name}」，請先把它們改到別的分類再刪`)
+    store.categories.value = store.categories.value.filter(x => x.id !== id)
+  })
+
   // ---- 商品 ----
   const saveProduct = (p: Omit<Product, 'id' | 'image'> & { id?: number | null }) => mutate('product/save', p, () => {
     const list = store.products.value
@@ -165,6 +190,7 @@ export function useCatalog() {
   return {
     state, connected, load,
     saveStation, deleteStation,
+    saveCategory, deleteCategory,
     saveProduct, deleteProduct, setProductImage, clearProductImage,
     saveMaterial, deleteMaterial,
     stockOp,

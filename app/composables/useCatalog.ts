@@ -35,10 +35,10 @@ export function useCatalog() {
 
   function apply(d: CatalogAll) {
     store.stations.value = d.stations.map(s => ({ id: String(s.id), name: s.name, emoji: s.emoji || '', sortOrder: Number(s.sortOrder) || 0 }))
-    store.categories.value = (d.categories || []).map(c => ({ id: String(c.id), name: c.name, emoji: c.emoji || '', sortOrder: Number(c.sortOrder) || 0 }))
+    store.categories.value = (d.categories || []).map(c => ({ id: String(c.id), name: c.name, emoji: c.emoji || '', sortOrder: Number(c.sortOrder) || 0, locations: Array.isArray(c.locations) ? c.locations.map(String) : undefined }))
     store.products.value = d.products.map((p): Product => ({
       id: p.id, name: p.name, emoji: p.emoji || '', price: Number(p.price) || 0, category: p.category || '', note: p.note || '',
-      cashOnly: !!p.cashOnly, openPrice: !!p.openPrice, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
+      cashOnly: !!p.cashOnly, openPrice: !!p.openPrice, inactive: !!p.inactive, locations: (p.locations || []).map(String), sortOrder: Number(p.sortOrder) || 0,
       materials: (p.materials || []).map((m: any) => ({ materialId: m.materialId, quantity: Number(m.quantity) || 0 })),
       image: p.image || '',
     }))
@@ -121,7 +121,10 @@ export function useCatalog() {
   // 舊版 print-agent（1.7 以前）沒有分類 API：清單只能從品項推出來，不能另外新增
   const saveCategory = async (c: Partial<CategoryDef> & { name: string }) => {
     await saveCategoryRaw(c)
-    checkEmoji(c.emoji, store.categories.value.find(x => x.name === c.name.trim())?.emoji)
+    const saved = store.categories.value.find(x => x.name === c.name.trim())
+    // 分類站別要 print-agent 1.16 起才會存；舊版會默默丟掉
+    if (connected() && c.locations && !saved?.locations) throw new Error('資料機的 print-agent 還是舊版，要更新到 1.16 才能保存分類的站別（其他內容已存好）')
+    checkEmoji(c.emoji, saved?.emoji)
   }
   const saveCategoryRaw = (c: Partial<CategoryDef> & { name: string }) => mutate('category/save', c, () => {
     const name = c.name.trim()
@@ -135,7 +138,11 @@ export function useCatalog() {
       cur.name = name
       if (c.emoji !== undefined) cur.emoji = c.emoji
       if (c.sortOrder != null) cur.sortOrder = c.sortOrder
-    } else all.push({ id: 'c' + Date.now(), name, emoji: c.emoji || '', sortOrder: all.length + 1 })
+      if (c.locations) cur.locations = [...c.locations]
+    } else all.push({ id: 'c' + Date.now(), name, emoji: c.emoji || '', sortOrder: all.length + 1, locations: c.locations ? [...c.locations] : undefined })
+    // 分類決定站別：這個分類的品項一起套用（和 print-agent 1.16 一樣）
+    const locs = all.find(x => x.name === name)?.locations
+    if (locs) store.products.value.forEach(p => { if (p.category === name) p.locations = [...locs] })
   })
   const deleteCategory = (id: string) => mutate('category/delete', { id }, () => {
     if (!store.categories.value.length) store.categories.value = store.categoryList.value.map((x, i) => ({ ...x, id: x.id || 'c' + (i + 1) }))
@@ -148,13 +155,19 @@ export function useCatalog() {
 
   // ---- 商品 ----
   const saveProduct = async (p: Omit<Product, 'id' | 'image'> & { id?: number | null }) => {
+    // 分類有設站別：品項跟著分類（print-agent 1.16 也會這樣做）
+    const catLocs = store.categories.value.find(c => c.name === (p.category || '').trim())?.locations
+    if (catLocs) p = { ...p, locations: [...catLocs] }
     await mutate('product/save', p, () => {
       const list = store.products.value
       const idx = p.id ? list.findIndex(x => x.id === p.id) : -1
       if (idx >= 0) list[idx] = { ...list[idx]!, ...p, id: list[idx]!.id }
       else list.push({ ...p, id: Math.max(0, ...list.map(x => x.id)) + 1, image: '' })
     })
-    checkEmoji(p.emoji, store.products.value.find(x => x.name === p.name.trim())?.emoji)
+    const saved = store.products.value.find(x => x.name === p.name.trim())
+    // 下架要 print-agent 1.15 起才會存；舊版會默默丟掉（等於又上架）
+    if (connected() && p.inactive && !saved?.inactive) throw new Error('資料機的 print-agent 還是舊版，要更新到 1.15 才能保存「下架」（其他內容已存好）')
+    checkEmoji(p.emoji, saved?.emoji)
   }
   const deleteProduct = (id: number) => mutate('product/delete', { id }, () => {
     store.products.value = store.products.value.filter(p => p.id !== id)

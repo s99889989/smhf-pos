@@ -5,7 +5,7 @@
 // 這台收銀機要在「系統設定 → 電子發票」打開「啟用」，沒打開時一律用測試號碼（印「測試號碼」）。
 import { detailRows, type PrintOrder } from './invoicePrint'
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable, errorText } from './stationApi'
+import { hubFetch, lanUnreachable, errorText, lanSkipped, markLanDown } from './stationApi'
 
 const ENABLED_KEY = 'pos-einvoice-enabled'
 // 只有「開立 / 作廢」要這台有啟用；查看（清單、狀態、查詢）任何連得到資料機的電腦都可以（例如家裡經 Hub）
@@ -41,13 +41,15 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown, tim
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   let lanError = ''
-  if (base !== 'off') {
+  if (base !== 'off' && !lanSkipped()) {
     try {
       const res = await withTimeout(signal => fetch(`${base}/einvoice/${path}`, { ...init(), signal }), timeoutMs)
       if (!(await lanUnreachable(res))) return toResult<T>(res)
       lanError = '區網連不到資料機'
+      markLanDown()
     } catch (e) {
       lanError = `連不到本機 print-agent（${(e as Error).message}）`
+      markLanDown()
     }
   }
   // 備援：走家裡 Hub

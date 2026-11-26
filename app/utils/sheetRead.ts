@@ -4,12 +4,21 @@
 
 export async function readSheet(file: File): Promise<string[][]> {
   const name = file.name.toLowerCase()
-  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(await file.text())
+  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(decodeText(new Uint8Array(await file.arrayBuffer())))
   if (name.endsWith('.xls')) throw new Error('不支援舊版 .xls，請在 Excel 另存成 .xlsx 或 CSV')
   return readXlsx(new Uint8Array(await file.arrayBuffer()))
 }
 
 // ---------- CSV ----------
+// CSV 的編碼：有 BOM 或是有效的 UTF-8 → UTF-8；UTF-16 BOM（Excel「Unicode 文字」）→ UTF-16；
+// 其他當 Big5（中文版 Excel 直接「另存 CSV」、舊系統匯出的檔案大多是 Big5）
+export function decodeText(buf: Uint8Array): string {
+  if (buf[0] === 0xFF && buf[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf)
+  if (buf[0] === 0xFE && buf[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf)
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf) } catch { /* 不是 UTF-8 */ }
+  try { return new TextDecoder('big5').decode(buf) } catch { return new TextDecoder().decode(buf) }
+}
+
 export function parseCsv(text: string): string[][] {
   text = text.replace(/^﻿/, '')
   const rows: string[][] = []

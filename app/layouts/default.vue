@@ -164,13 +164,19 @@ const navSections = [
     items: [
       { to: '/',             icon: '🏷️', label: '收銀點餐' },
       { to: '/internal-use', icon: '📋', label: '內部領用' },
+      { to: '/shop-orders', icon: '🛒', label: '線上訂單' },
     ],
   },
   {
-    label: '管理',
+    label: '品項管理',
     items: [
       { to: '/products',  icon: '📦', label: '品項管理' },
       { to: '/materials', icon: '🌾', label: '物料庫存' },
+    ],
+  },
+  {
+    label: '人員管理',
+    items: [
       { to: '/staff',     icon: '👤', label: '員工管理' },
       { to: '/vip',       icon: '⭐', label: 'VIP 管理' },
     ],
@@ -179,7 +185,6 @@ const navSections = [
     label: '報表',
     items: [
       { to: '/reports',     icon: '📊', label: '營業報表' },
-      { to: '/shop-orders', icon: '🛒', label: '線上訂單' },
     ],
   },
   {

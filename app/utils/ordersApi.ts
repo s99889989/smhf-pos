@@ -5,7 +5,7 @@
 // 兩條都不通時，訂單先放在這台瀏覽器（localStorage pos-order-outbox），之後每分鐘和下次開網頁時補送。
 // 每筆帶 clientId，重送不會存兩次。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable, errorText } from './stationApi'
+import { hubFetch, lanUnreachable, errorText, lanSkipped, markLanDown } from './stationApi'
 
 const OUTBOX_KEY = 'pos-order-outbox'
 
@@ -31,13 +31,15 @@ async function post(sub: string, body: unknown, timeoutMs = 15000): Promise<{ re
   const init: RequestInit = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }
   let lanError = ''
   const base = printAgentUrl()
-  if (base !== 'off') {
+  if (base !== 'off' && !lanSkipped()) {
     try {
       const res = await withTimeout(signal => fetch(`${base}/orders/${sub}`, { ...init, signal }), timeoutMs)
       if (!(await lanUnreachable(res))) return { res, error: '' }
       lanError = '區網連不到資料機'
+      markLanDown()
     } catch {
       lanError = '連不到本機 print-agent'
+      markLanDown()
     }
   }
   try {

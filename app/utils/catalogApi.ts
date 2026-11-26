@@ -3,12 +3,12 @@
 //   收銀機的 print-agent 轉給資料機；行動平板的 print-agent 留一份鏡像，離線也能賣、回來再補送庫存。
 // 本機 print-agent 沒開或區網連不到資料機時，改走家裡 Hub（/api/station/catalog/**，見 stationApi.ts）。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable, errorText } from './stationApi'
+import { hubFetch, lanUnreachable, errorText, lanSkipped, markLanDown } from './stationApi'
 
 export interface CatalogAll {
   ok: true
   stations: { id: string; name: string; emoji?: string; sortOrder: number }[]
-  categories?: { id: string; name: string; emoji?: string; sortOrder: number }[] // print-agent 1.8 起；emoji 1.14 起
+  categories?: { id: string; name: string; emoji?: string; sortOrder: number; locations?: string[] }[] // print-agent 1.8 起；emoji 1.14 起；locations 1.16 起
   products: any[]
   materials: any[]
   logs: any[]
@@ -48,11 +48,13 @@ async function call(method: 'GET' | 'POST', sub: string, body?: BodyInit, conten
   const init: RequestInit = { method, headers: method === 'POST' ? { 'Content-Type': contentType } : undefined, body }
   let res: Response | null = null
   let lanError = ''
-  try {
+  if (lanSkipped()) lanError = '本機 print-agent 剛剛連不到'
+  else try {
     res = await fetchWithTimeout(`${base()}/catalog/${sub}`, init, timeoutMs, false)
-    if (await lanUnreachable(res)) { lanError = '區網連不到資料機'; res = null }
+    if (await lanUnreachable(res)) { lanError = '區網連不到資料機'; res = null; markLanDown() }
   } catch (e) {
     lanError = e instanceof CatalogError ? e.message : '連不到本機 print-agent'
+    markLanDown()
   }
   if (res) route = 'lan'
   else {

@@ -22,6 +22,13 @@ export function errorText(data: any, status: number) {
   return `資料機回應 ${status}`
 }
 
+// 本機 print-agent 不通（家裡電腦、沒開 print-agent、區網斷線）時記住 1 分鐘，期間直接走 Hub，
+// 不要每個請求都先撞一次 127.0.0.1（console 一直噴 ERR_CONNECTION_REFUSED，也比較慢）。1 分鐘後再試區網。
+const LAN_RETRY_MS = 60000
+let lanDownUntil = 0
+export function lanSkipped() { return Date.now() < lanDownUntil }
+export function markLanDown() { lanDownUntil = Date.now() + LAN_RETRY_MS }
+
 /** 本機回應是否代表「區網連不到資料機」，該改走 Hub */
 export async function lanUnreachable(res: Response) {
   if (res.status !== 503) return false

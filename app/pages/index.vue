@@ -1,19 +1,25 @@
 <template>
-  <div class="flex h-full">
+  <div class="flex h-full" @contextmenu="blockMenu">
 
     <!-- 品項區（手機：和訂單區二選一切換，見 mobileView） -->
     <div class="flex-col flex-1 min-w-0 overflow-hidden" :class="mobileView === 'cart' ? 'hidden md:flex' : 'flex'">
 
       <!-- 分類 -->
+      <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
       <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex gap-2 overflow-x-auto shrink-0">
         <button
-                v-for="c in categories" :key="c"
-                @click="curCat = c"
-                class="px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors border"
-                :class="curCat === c
-            ? 'bg-gray-100 text-gray-900 border-gray-400 font-medium'
-            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-        >{{ catEmoji(c) ? catEmoji(c) + ' ' : '' }}{{ c }}</button>
+                v-for="(c, ci) in categories" :key="c"
+                @click="pickCat(c)"
+                class="shrink-0 w-[4.5rem] md:w-24 flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 rounded-xl border transition-colors"
+                :class="activeCat === c
+            ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
+            : 'bg-white border-gray-200 hover:bg-gray-50'"
+        >
+          <span class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-xl md:text-2xl leading-none font-bold"
+                :class="CAT_TINTS[ci % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
+          <span class="w-full text-xs md:text-sm text-center truncate leading-tight"
+                :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
+        </button>
         <!-- 收銀站在「系統設定」選；沒設定時才在這裡小提示（已設定就不顯示） -->
         <NuxtLink v-if="!station" to="/settings" class="ml-auto shrink-0 whitespace-nowrap self-center text-xs text-amber-600 hover:underline">
           未設定收銀站（顯示全部品項）→ 設定
@@ -21,25 +27,31 @@
       </div>
 
       <!-- 品項卡片 -->
-      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 content-start">
+      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2 md:gap-2.5 content-start">
         <button
                 v-for="prod in filteredProducts" :key="prod.id"
                 @click="addItem(prod)"
-                class="relative text-left bg-white border rounded-xl p-3.5 active:scale-95 transition-all"
+                @pointerdown="lastPointer = $event.pointerType"
+                @contextmenu.prevent="removeOne(prod)"
+                @wheel="wheelCard($event, prod)"
+                class="relative flex flex-col justify-start text-left bg-white border rounded-xl p-2.5 md:p-3 active:scale-95 transition-all"
                 :class="prod.cashOnly && curPay !== 'cash'
             ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400'
             : 'border-gray-200 hover:border-green-500 hover:bg-green-50'"
         >
-          <span v-if="cartQty(prod.id)" class="absolute top-2 right-2 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+          <span v-if="cartQty(prod.id)" class="absolute top-2 right-2 z-10 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {{ cartQty(prod.id) }}
           </span>
-          <!-- 商品圖（資料機縮圖）：載不到就只顯示文字 -->
-          <div v-if="prod.image && !imgErrors.has(prod.image)" class="-mx-3.5 -mt-3.5 mb-2 aspect-[4/3] overflow-hidden rounded-t-xl bg-gray-100">
-            <CatalogImg :file="prod.image" :alt="prod.name"
-                        class="w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
+          <!-- 圖片區：每張卡片都有，大小一致（4:3）。有圖放圖（資料機縮圖），沒圖或載不到就放 emoji，再沒有就放品名第一個字。
+               用 padding-top 撐出 4:3，XP 的 Mypal 不支援 aspect-ratio -->
+          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
+            <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
+                        class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
+            <div v-else class="absolute inset-0 flex items-center justify-center">
+              <span v-if="prod.emoji" class="text-5xl leading-none">{{ prod.emoji }}</span>
+              <span v-else class="text-4xl font-bold text-gray-300 leading-none">{{ prod.name.slice(0, 1) }}</span>
+            </div>
           </div>
-          <!-- 沒圖片（或圖載不到）時，有設 emoji 就顯示 emoji -->
-          <div v-else-if="prod.emoji" class="text-4xl leading-none mb-2">{{ prod.emoji }}</div>
           <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
           <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
           <div v-else class="flex items-baseline gap-1.5">
@@ -124,7 +136,7 @@
               <button v-if="item.openPrice" @click="editItemPrice(i)" class="ml-1 text-orange-600 hover:underline py-1">改價</button>
             </div>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex items-center gap-1 rounded-full hover:bg-gray-50 px-0.5" title="滑鼠滾輪：往上加、往下減" @wheel.prevent="wheelQty($event, i)">
             <button @click="changeQty(i, -1)" class="w-8 h-8 md:w-6 md:h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">−</button>
             <span class="w-6 text-center text-sm font-semibold">{{ item.qty }}</span>
             <button @click="changeQty(i, 1)"  class="w-8 h-8 md:w-6 md:h-6 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 text-sm leading-none">+</button>
@@ -662,7 +674,9 @@
   import { useGuidedCheckout, loadGuidedCheckout } from '~/composables/useGuidedCheckout'
 
   const { products, discountTypes, employees, vipMembers, addOrder, stationLabel, categoryList, categoryEmoji } = usePosStore()
-  const catEmoji = (c: string) => (c === '全部' ? '' : categoryEmoji(c))
+  const catEmoji = (c: string) => categoryEmoji(c)
+  // 分類圖示的淡色底（依序輪流）
+  const CAT_TINTS = ['bg-blue-100 text-blue-600', 'bg-purple-100 text-purple-600', 'bg-emerald-100 text-emerald-600', 'bg-pink-100 text-pink-600', 'bg-amber-100 text-amber-600', 'bg-orange-100 text-orange-600', 'bg-red-100 text-red-600', 'bg-green-100 text-green-600']
 
 
   // 商品圖片（資料機上的縮圖，<CatalogImg> 會依區網 / Hub 取圖）；載不到的就只顯示文字
@@ -679,7 +693,14 @@
   const enabledDiscounts = computed(() => discountTypes.value.filter(d => d.enabled))
 
   const curLoc      = ref<string>('')   // = 本機收銀站；沒設定時是空的（顯示全部品項）
-  const curCat      = ref('全部')
+  // 目前分類：沒有「全部」，記住這台上次選的（localStorage），找不到就用第一個分類
+  const CAT_KEY = 'pos-cashier-cat'
+  const curCat      = ref('')
+  onMounted(() => { try { curCat.value = localStorage.getItem(CAT_KEY) || '' } catch {} })
+  function pickCat(c: string) {
+    curCat.value = c
+    try { localStorage.setItem(CAT_KEY, c) } catch {}
+  }
   // 手機（寬 < 768px）一次只顯示一區：選商品 / 訂單結帳；平板、電腦兩區並排，這個值沒作用
   const mobileView  = ref<'products' | 'cart'>('products')
   const curPay      = ref<'cash' | 'card' | 'hua' | 'voucher'>('cash')
@@ -828,6 +849,50 @@
     if (prod.openPrice) { openPriceModal(prod.id, prod.name, prod.price, -1); return }
     pushItem(prod, prod.price)
   }
+  // 商品卡按右鍵：數量減 1（減到 0 就從訂單拿掉）。時價品項有好幾行不同價錢時，減最後加入的那一行。
+  // 觸控長按也會觸發右鍵事件：只擋掉選單、不減數量，免得平板上按久一點就被扣掉。
+  const lastPointer = ref('')
+  function removeOne(prod: Product) {
+    if (lastPointer.value === 'touch') return
+    for (let i = cart.value.length - 1; i >= 0; i--) {
+      if (cart.value[i]!.productId === prod.id) { changeQty(i, -1); return }
+    }
+  }
+  // 收銀頁不跳瀏覽器右鍵選單（輸入框除外，才能貼上）
+  function blockMenu(e: MouseEvent) {
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+    e.preventDefault()
+  }
+  // 訂單明細的數量（− 數字 +）上滾滑鼠滾輪：往上加 1、往下減 1。只在數量那一小塊有效，明細清單其他地方照常捲動。
+  // 觸控板一次會送很多小事件：累積到一格（約 50）才算一次。
+  let wheelAcc = 0
+  let wheelAt = 0
+  /** 累積滾輪量，滿一格回傳 +1（往上）或 -1（往下），不滿回傳 0 */
+  function wheelStep(e: WheelEvent) {
+    const now = Date.now()
+    if (now - wheelAt > 300) wheelAcc = 0
+    wheelAt = now
+    wheelAcc += e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY // deltaMode 1 = 以「行」為單位（Firefox / Mypal）
+    if (Math.abs(wheelAcc) < 50) return 0
+    const d = wheelAcc < 0 ? 1 : -1
+    wheelAcc = 0
+    return d
+  }
+  function wheelQty(e: WheelEvent, i: number) {
+    const d = wheelStep(e)
+    if (d && cart.value[i]) changeQty(i, d)
+  }
+  // 商品卡上的滾輪：只有已經在訂單裡（右上角有數量）的商品才調數量、擋住捲動；
+  // 還沒加入的卡片照常捲動商品格。時價品項有好幾行時，加減的都是最後加入的那一行（跟右鍵一樣）。
+  function wheelCard(e: WheelEvent, prod: Product) {
+    let idx = -1
+    for (let i = cart.value.length - 1; i >= 0; i--) if (cart.value[i]!.productId === prod.id) { idx = i; break }
+    if (idx < 0) return
+    e.preventDefault()
+    const d = wheelStep(e)
+    if (d) changeQty(idx, d)
+  }
   // 同品項同價錢就加數量；時價品項不同價錢分開列
   function pushItem(prod: { id: number; name: string; openPrice?: boolean }, price: number, qty = 1) {
     const ex = cart.value.find(i => i.productId === prod.id && i.price === price)
@@ -878,16 +943,17 @@
   }
 
   const locProducts = computed(() =>
-          products.value.filter(p => !curLoc.value || p.locations.includes(curLoc.value)).sort((a, b) => a.sortOrder - b.sortOrder)
+          products.value.filter(p => !p.inactive && (!curLoc.value || p.locations.includes(curLoc.value))).sort((a, b) => a.sortOrder - b.sortOrder)
   )
   // 分類頁籤：依品項管理裡排的分類順序，只列這站有品項的分類
   const categories = computed(() => {
     const used = new Set(locProducts.value.map(p => p.category || '其他'))
     const ordered = categoryList.value.map(c => c.name).filter(n => used.has(n))
-    return ['全部', ...ordered, ...[...used].filter(n => !ordered.includes(n))]
+    return [...ordered, ...[...used].filter(n => !ordered.includes(n))]
   })
+  const activeCat = computed(() => (categories.value.includes(curCat.value) ? curCat.value : categories.value[0] || ''))
   const filteredProducts = computed(() =>
-          curCat.value === '全部' ? locProducts.value : locProducts.value.filter(p => (p.category || '其他') === curCat.value)
+          locProducts.value.filter(p => (p.category || '其他') === activeCat.value)
   )
   const subtotal = computed(() => cart.value.reduce((s, i) => s + i.price * i.qty, 0))
   const total    = computed(() => cart.value.reduce((s, i) => s + i.finalPrice * i.qty, 0))
@@ -1198,7 +1264,6 @@
     })
   }
 
-  watch(curLoc, () => { curCat.value = '全部' })
 </script>
 
 <style>

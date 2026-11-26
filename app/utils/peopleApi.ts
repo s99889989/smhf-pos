@@ -3,7 +3,7 @@
 //   行動平板的 print-agent 留一份鏡像，離線也能選員工 / VIP（修改要連得到資料機）。
 // 本機 print-agent 沒開或區網連不到資料機時，改走家裡 Hub（/api/station/people/**，見 stationApi.ts）。
 import { printAgentUrl } from './printAgent'
-import { hubFetch, lanUnreachable, errorText } from './stationApi'
+import { hubFetch, lanUnreachable, errorText, lanSkipped, markLanDown } from './stationApi'
 
 export type PeopleList = 'employees' | 'vipMembers' | 'discountTypes'
 
@@ -33,12 +33,13 @@ async function call(method: 'GET' | 'POST', sub: string, body?: unknown, timeout
   let res: Response | null = null
   let lanError = ''
   const base = printAgentUrl()
-  if (base !== 'off') {
+  if (base !== 'off' && !lanSkipped()) {
     try {
       res = await withTimeout(signal => fetch(`${base}/people/${sub}`, { ...init, signal }), timeoutMs)
-      if (await lanUnreachable(res)) { lanError = '區網連不到資料機'; res = null }
+      if (await lanUnreachable(res)) { lanError = '區網連不到資料機'; res = null; markLanDown() }
     } catch {
       lanError = '連不到本機 print-agent'
+      markLanDown()
     }
   }
   if (!res) {

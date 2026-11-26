@@ -1,5 +1,6 @@
 // composables/usePosStore.ts
 import { saveOrder, newClientId } from '~/utils/ordersApi'
+import { nextOrderNo } from '~/utils/orderNo' // 單號照舊系統：yyMMdd + P + 機台號 + 4 碼流水號
 
 export interface Material {
   id: number
@@ -44,6 +45,7 @@ export interface Product {
   note: string
   cashOnly: boolean
   openPrice?: boolean   // 時價：結帳點這個品項時輸入當次售價（price 只當預設參考價）
+  inactive?: boolean    // 下架：收銀台不顯示，品項管理放在「已下架」區（print-agent 1.15 起）
   locations: string[]   // 上架在哪幾個收銀站（站別 id，見 stations；後台可自訂）
   sortOrder: number
   materials: ProductMaterial[]
@@ -64,6 +66,7 @@ export interface CategoryDef {
   name: string
   emoji?: string        // print-agent 1.14 起
   sortOrder: number
+  locations?: string[]  // 分類決定站別（print-agent 1.16 起）：有設定時，這個分類的品項都上架在這些站；沒設定＝品項各自設
 }
 
 export interface OrderItem {
@@ -100,23 +103,6 @@ export interface Order {
   invoiceIsMock?: boolean
   cashierId?: string      // 結帳人（員工 ID）
   cashierName?: string
-}
-
-// 單號：這台機器代號-月日-當日流水號，例 KQ-1125-003（機器代號第一次用時隨機產生，存在 localStorage）
-function nextOrderNo(at: Date) {
-  const ls = (k: string, v?: string) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v) } catch { /* 無痕模式 */ } return null }
-  let code = ls('pos-device-code')
-  if (!code) {
-    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
-    code = A[Math.floor(Math.random() * A.length)]! + A[Math.floor(Math.random() * A.length)]!
-    ls('pos-device-code', code)
-  }
-  const md = String(at.getMonth() + 1).padStart(2, '0') + String(at.getDate()).padStart(2, '0')
-  let seq: { day: string; n: number } = { day: '', n: 0 }
-  try { seq = JSON.parse(ls('pos-order-seq') || '') } catch { /* 第一次 */ }
-  const n = seq.day === md ? seq.n + 1 : 1
-  ls('pos-order-seq', JSON.stringify({ day: md, n }))
-  return `${code}-${md}-${String(n).padStart(3, '0')}`
 }
 
 export interface DiscountType {

@@ -286,7 +286,7 @@ function discountedPrice(price: number) {
 // ── 商品 ──
 const curCat = ref('全部')
 const shopProducts = computed(() =>
-  products.value.filter(p => p.locations.includes('shop') || p.locations.includes('stall'))
+  products.value.filter(p => !p.inactive && (p.locations.includes('shop') || p.locations.includes('stall')))
     .sort((a, b) => a.sortOrder - b.sortOrder)
 )
 const categories = computed(() => ['全部', ...new Set(shopProducts.value.map(p => p.category))])

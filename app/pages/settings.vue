@@ -28,6 +28,23 @@
         </div>
       </div>
 
+      <!-- 本機機台號（單號用） -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="text-sm font-semibold text-gray-800">本機機台號</h2>
+          <p class="text-xs text-gray-400 mt-0.5">單號照舊系統規則：日期 + P + 機台號 + 當日流水號，例 261125P10001。每台（含離線平板）要設不同號碼才不會撞號。只存在這台機器。</p>
+        </div>
+        <div class="px-5 py-4 space-y-2 text-sm">
+          <div class="flex flex-wrap gap-2">
+            <button v-for="n in ['1','2','3','4','5','6','7','8','9']" :key="n" @click="writeMachineNo(n)"
+              class="w-10 h-10 rounded-xl border text-base font-semibold"
+              :class="machineNo === n ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50'">{{ n }}</button>
+          </div>
+          <p v-if="!machineNo" class="text-xs text-amber-600">尚未指定：單號暫用機台號 0（例 {{ sampleNo('0') }}），請選一個號碼。</p>
+          <p v-else class="text-xs text-gray-500">下一筆單號像 {{ sampleNo(machineNo) }}（每天從 0001 開始）</p>
+        </div>
+      </div>
+
       <!-- 引導式結帳 -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden break-inside-avoid mb-6 w-full inline-block">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
@@ -266,8 +283,15 @@ const { discountTypes } = usePosStore()
 
 // ---- 本機收銀站 ----
 import { writeStation, loadStation } from '~/composables/useStation'
+import { useMachineNo, loadMachineNo, writeMachineNo } from '~/utils/orderNo'
+const machineNo = useMachineNo()
+function sampleNo(m: string) {
+  const d = new Date(), p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getFullYear() % 100)}${p(d.getMonth() + 1)}${p(d.getDate())}P${m}0001`
+}
 const station = useStation()
 onMounted(loadStation)
+onMounted(loadMachineNo)
 
 // ---- 引導式結帳（每台機器自己記）----
 import { useGuidedCheckout, loadGuidedCheckout, writeGuidedCheckout } from '~/composables/useGuidedCheckout'

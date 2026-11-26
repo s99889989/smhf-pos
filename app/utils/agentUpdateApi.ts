@@ -34,7 +34,7 @@ async function withTimeout(run: (signal?: AbortSignal) => Promise<Response>, ms:
 }
 
 /** 先打本機 print-agent（區網），本機沒開、連不到資料機或是舊版（404）就改走 Hub */
-async function call(sub: string, init: RequestInit, timeoutMs: number): Promise<{ res: Response; via: 'lan' | 'hub' }> {
+async function call(sub: string, init: RequestInit, timeoutMs: number, hubInit: RequestInit = init): Promise<{ res: Response; via: 'lan' | 'hub' }> {
   const base = printAgentUrl()
   if (base !== 'off') {
     try {
@@ -43,7 +43,7 @@ async function call(sub: string, init: RequestInit, timeoutMs: number): Promise<
     } catch { /* 改走 Hub */ }
   }
   if (!stationToken()) throw new Error('連不到資料機：本機 print-agent 沒開或不是 1.7 版，這台也沒設收銀機密碼不能走 Hub')
-  const res = await withTimeout(signal => hubFetch(sub, { ...init, signal }), timeoutMs + 5000)
+  const res = await withTimeout(signal => hubFetch(sub, { ...hubInit, signal }), timeoutMs + 5000)
   return { res, via: 'hub' }
 }
 
@@ -71,10 +71,14 @@ export async function publishRelease(file: File, updateKey: string, note: string
   if (bytes.length < 4096 || bytes[0] !== 0x4d || bytes[1] !== 0x5a) throw new Error('這不是 exe 檔，請選 smhf-print-agent.exe')
   const sig = hmacSha256Hex(updateKey, bytes)
   const q = `sig=${sig}&note=${encodeURIComponent(note.slice(0, 200))}`
-  // text/plain：舊瀏覽器打本機不會先送 OPTIONS
+  const body = bytes.buffer as ArrayBuffer
+  // 打本機用 text/plain：舊瀏覽器不會先送 OPTIONS。
+  // 走 Hub 一定要 application/octet-stream：Netlify 會把 text/* 的內容當文字（UTF-8）處理，exe 會被改壞、簽章就對不上
   const { res, via } = await call(`update/upload?${q}`, {
-    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: bytes.buffer as ArrayBuffer,
-  }, 60000)
+    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body,
+  }, 60000, {
+    method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body,
+  })
   const j = await res.json().catch(() => null)
   if (res.status === 404) throw new Error('資料機的 print-agent 還不是 1.7 版，第一次要手動換')
   if (!res.ok || !j?.ok) throw new Error(errorText(j, res.status))

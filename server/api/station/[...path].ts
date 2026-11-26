@@ -9,7 +9,7 @@
 //   HUB_URL             選填，預設家裡 Hub
 import { timingSafeEqual } from 'node:crypto'
 
-const ALLOWED = /^(einvoice|catalog|orders|people)\/[A-Za-z0-9_\-./%]*$/
+const ALLOWED = /^(einvoice|catalog|orders|people|presence|update)\/[A-Za-z0-9_\-./%]*$/
 
 function sameToken(a: string, b: string) {
   const x = Buffer.from(a), y = Buffer.from(b)
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
         },
         bodyBase64: body ? Buffer.from(body).toString('base64') : undefined,
       }),
-      signal: AbortSignal.timeout(path.startsWith('einvoice/run') || path.startsWith('einvoice/query') ? 145000 : 30000),
+      signal: AbortSignal.timeout(path.startsWith('einvoice/run') || path.startsWith('einvoice/query') ? 145000 : path.startsWith('update/upload') ? 60000 : 30000),
     })
   } catch (e) {
     throw createError({ statusCode: 502, statusMessage: `連不到家裡 Hub：${(e as Error).message}` })

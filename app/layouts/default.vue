@@ -126,11 +126,17 @@ const navSections = [
     ],
   },
   {
-    label: '報表與設定',
+    label: '報表',
     items: [
       { to: '/reports',     icon: '📊', label: '營業報表' },
       { to: '/shop-orders', icon: '🛒', label: '線上訂單' },
+    ],
+  },
+  {
+    label: '系統',
+    items: [
       { to: '/settings',    icon: '⚙️', label: '系統設定' },
+      { to: '/connections', icon: '📡', label: '連線狀況' },
     ],
   },
 ]

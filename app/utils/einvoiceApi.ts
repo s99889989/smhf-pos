@@ -9,7 +9,8 @@ import { hubFetch, lanUnreachable, errorText, lanSkipped, markLanDown } from './
 
 const ENABLED_KEY = 'pos-einvoice-enabled'
 // 只有「開立 / 作廢」要這台有啟用；查看（清單、狀態、查詢）任何連得到資料機的電腦都可以（例如家裡經 Hub）
-const READ_ONLY = new Set(['status', 'list', 'query'])
+// 匯入舊系統發票只存紀錄、不開票不上傳，也不用啟用（例如在家裡或資料機上匯入）
+const READ_ONLY = new Set(['status', 'list', 'query', 'legacy-import'])
 
 export function einvoiceEnabled() {
   try { return localStorage.getItem(ENABLED_KEY) === '1' } catch { return false }
@@ -112,10 +113,14 @@ export interface InvoiceRecord {
   queryAt?: string
   cancelStatus: 'pending' | 'done' | 'needApproval' | null
   cancelMsg: string
+  buyerId?: string
+  legacy?: boolean // 舊系統（BK35 / 葆光）的發票，uploadStatus = 'legacy'（print-agent 1.18 起）
+  live?: boolean // true = 資料機直接查舊系統 SQL 來的；false/沒有 = 從 CSV 匯入的
+  payNote?: string // 舊系統「備註說明」：現收、信用卡、宅配匯款…
 }
 /** 營業報表用：資料機上 from～to（yyyy-MM-dd，含）開立的發票和上傳 / 作廢狀態，含平板同步來的。一次最多兩個月。 */
 export const listEInvoices = (from: string, to: string) =>
-  call<{ from: string; to: string; invoices: InvoiceRecord[]; truncated: boolean }>('POST', 'list', { from, to }, 40000)
+  call<{ from: string; to: string; invoices: InvoiceRecord[]; truncated: boolean; legacyLive?: boolean; legacyError?: string | null }>('POST', 'list', { from, to }, 40000)
 export const runEInvoiceQueue = () => call<any>('POST', 'run', {}, 120000)
 /** 向加值中心查一張發票的狀態 */
 export const queryEInvoice = (invoiceNo: string) =>
@@ -126,3 +131,31 @@ export const queryEInvoiceRange = (from: string, to: string) =>
 
 /** BM92177850 → BM-92177850（列印用） */
 export const formatInvoiceNo = (no: string) => `${no.slice(0, 2)}-${no.slice(2)}`
+
+/** 舊系統匯出 CSV 的一張發票（網頁解析後送資料機） */
+export interface LegacyInvoice {
+  invoiceNo: string
+  date: string // yyyy-MM-dd
+  time: string // HH:mm:ss（建檔時間跟發票同一天才有，否則 00:00:00）
+  total: number
+  buyerId: string
+  orderNo: string
+  posId: string // 001 小舖
+  payNote: string
+  voided: boolean
+  seq: string
+  createdAt: string
+}
+export interface LegacyImportResult {
+  dryRun: boolean
+  added: number
+  updated: number
+  unchanged: number
+  invalid: number
+  inNewSystem: number
+  inNewSystemNos: string[]
+  invalidNos: string[]
+}
+/** 匯入舊系統發票到資料機（print-agent 1.18 起）：只存紀錄，不上傳加值中心；dryRun 只算會新增幾張 */
+export const importLegacyInvoices = (invoices: LegacyInvoice[], dryRun: boolean) =>
+  call<LegacyImportResult>('POST', 'legacy-import', { invoices, dryRun }, 60000)

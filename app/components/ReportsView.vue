@@ -8,7 +8,16 @@
         <p class="text-xs text-gray-400 mt-0.5">{{ TITLES[props.section].sub }}</p>
       </div>
       <!-- 每日 / 月 切換 -->
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- 電子發票來源：全部 / 葆光舊系統匯入 / 本系統開立 -->
+        <div v-if="props.section === 'invoices'" class="flex border border-gray-200 rounded-xl overflow-hidden">
+          <button
+            v-for="(o, i) in INV_SOURCES" :key="o.value"
+            @click="invSource = o.value"
+            class="px-4 py-2 text-sm font-medium transition-colors"
+            :class="[invSource === o.value ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50', i ? 'border-l border-gray-200' : '']"
+          >{{ o.label }}</button>
+        </div>
         <div class="flex border border-gray-200 rounded-xl overflow-hidden">
           <button
             @click="mode = 'daily'"
@@ -113,6 +122,7 @@
             <button class="text-green-700 hover:underline" :disabled="invLoading" @click="refreshAll">
               {{ invLoading ? '讀取中…' : '重新整理' }}
             </button>
+            <LegacyInvoiceImport @imported="loadInvoices" />
             <button v-if="invoices.length" class="text-blue-600 hover:underline" :disabled="querying" @click="queryRange"
               title="向加值中心查這段期間已上傳發票的狀態（資料機每天也會自動查前一天的）">
               {{ querying ? '查詢中…' : '向加值中心查詢' }}
@@ -127,13 +137,19 @@
               <div class="text-lg font-bold" :class="s.color">{{ s.value }}</div>
             </div>
           </div>
+          <div v-if="legacyCount" class="px-5 py-2 text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
+            其中 {{ legacyCount }} 張是葆光舊系統的發票（金額 ${{ legacyAmount.toLocaleString() }}，不含作廢），由舊系統上傳加值中心，這裡只供查詢。
+          </div>
+          <div v-if="legacyError && invSource !== 'new'" class="px-5 py-2 text-xs text-amber-600 border-b border-gray-100">
+            資料機查不到葆光舊系統的資料庫（{{ legacyError }}），下面只列出新系統的發票和用 CSV 匯入過的。
+          </div>
           <div v-if="invTruncated" class="px-5 py-2 text-xs text-amber-600">期間內發票太多，只列出前 5000 張</div>
-          <div v-if="mockInvCount" class="px-5 py-2 text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
+          <div v-if="mockInvCount && invSource !== 'legacy'" class="px-5 py-2 text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
             交易紀錄裡有 {{ mockInvCount }} 筆是「測試」號碼：結帳那台收銀機沒在系統設定啟用電子發票，號碼是網頁自己編的，
             沒有向資料機開立、不會上傳，所以不算在上面的開立張數。要開正式發票請到那台的系統設定 → 電子發票打開。
           </div>
           <div v-if="!shownInvoices.length" class="py-10 text-center text-gray-300 text-sm">
-            {{ invLoading ? '讀取中…' : invProblemsOnly ? '沒有待處理的發票' : (mode === 'daily' ? '此日' : '此月') + '沒有開立發票' + (mockInvCount ? '（只有測試號碼）' : '') }}
+            {{ invLoading ? '讀取中…' : invProblemsOnly ? '沒有待處理的發票' : (mode === 'daily' ? '此日' : '此月') + (invSource === 'legacy' ? '沒有匯入的葆光發票' : '沒有開立發票') + (mockInvCount && invSource !== 'legacy' ? '（只有測試號碼）' : '') }}
           </div>
           <div v-else class="overflow-auto" style="max-height:70vh;">
             <table class="w-full text-sm">
@@ -152,7 +168,7 @@
                 <tr v-for="inv in shownInvoices" :key="inv.invoiceNo" class="border-b border-gray-100 hover:bg-gray-50">
                   <td class="px-5 py-2.5 font-mono text-gray-900">{{ formatInvoiceNo(inv.invoiceNo) }}</td>
                   <td class="px-3 py-2.5 text-gray-500 text-xs">{{ inv.issuedAt.slice(5, 16) }}</td>
-                  <td class="px-3 py-2.5 text-gray-500 text-xs">{{ inv.station }}<span v-if="inv.fromTablet" class="ml-1 text-gray-400">(平板)</span></td>
+                  <td class="px-3 py-2.5 text-gray-500 text-xs">{{ inv.station }}<span v-if="inv.fromTablet" class="ml-1 text-gray-400">(平板)</span><span v-if="inv.legacy && inv.orderNo" class="ml-1 text-gray-400 font-mono">{{ inv.orderNo }}</span></td>
                   <td class="px-3 py-2.5 text-xs">
                     <span class="px-1.5 py-0.5 rounded" :class="invState(inv).cls">{{ invState(inv).label }}</span>
                   </td>
@@ -361,6 +377,7 @@ const TITLES = {
   invoices: { title: '電子發票', sub: '資料機上開立的發票與上傳 / 作廢狀態' },
   orders:   { title: '交易紀錄', sub: '各收銀機、平板的每一筆交易' },
 } as const
+import LegacyInvoiceImport from '~/components/LegacyInvoiceImport.vue'
 import { listEInvoices, cancelEInvoice, formatInvoiceNo, queryEInvoice, queryEInvoiceRange, type InvoiceRecord } from '~/utils/einvoiceApi'
 import { listOrders, pendingOrders, editOrder } from '~/utils/ordersApi'
 
@@ -510,6 +527,7 @@ const invLoading = ref(false)
 const invError = ref('')
 const invTruncated = ref(false)
 const invProblemsOnly = ref(false)
+const legacyError = ref('') // 資料機直接查葆光 SQL 失敗的原因（print-agent 1.18）
 
 const invRange = computed(() => {
   if (mode.value === 'daily') return { from: selectedDate.value, to: selectedDate.value }
@@ -530,6 +548,7 @@ async function loadInvoices() {
   if (r.ok) {
     invoices.value = [...r.data.invoices].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt) || b.invoiceNo.localeCompare(a.invoiceNo))
     invTruncated.value = r.data.truncated
+    legacyError.value = r.data.legacyError ?? ''
   } else {
     invoices.value = []
     invTruncated.value = false
@@ -562,6 +581,12 @@ async function queryRange() {
 }
 
 function invState(inv: InvoiceRecord) {
+  if (inv.legacy) {
+    const msg = [inv.payNote, inv.buyerId ? `統編 ${inv.buyerId}` : ''].filter(Boolean).join(' · ')
+    return inv.cancelStatus === 'done'
+      ? { label: '已作廢', cls: 'bg-gray-100 text-gray-500', msg: ['舊系統作廢', msg].filter(Boolean).join(' · ') }
+      : { label: '舊系統', cls: 'bg-blue-50 text-blue-700', msg }
+  }
   if (inv.cancelStatus === 'done') return { label: '已作廢', cls: 'bg-gray-100 text-gray-500', msg: inv.cancelMsg }
   if (inv.cancelStatus === 'needApproval') return { label: '作廢待核准', cls: 'bg-red-100 text-red-700', msg: inv.cancelMsg || '跨期作廢要先向國稅局申請核准文號' }
   if (inv.cancelStatus === 'pending') return { label: '作廢中', cls: 'bg-amber-100 text-amber-700', msg: inv.cancelMsg || '排程會再試' }
@@ -582,11 +607,23 @@ function orderInv(order: Order) {
   return { no: o.invoiceNo, ...invState(inv) }
 }
 
+// 來源切換：全部 / 葆光（舊系統匯入）/ 本系統開立；統計、清單都跟著切
+const INV_SOURCES = [
+  { value: 'all', label: '全部' },
+  { value: 'legacy', label: '葆光' },
+  { value: 'new', label: '本系統' },
+] as const
+const invSource = ref<'all' | 'legacy' | 'new'>('all')
+const sourceInvoices = computed(() =>
+  invSource.value === 'all' ? invoices.value : invoices.value.filter(i => !!i.legacy === (invSource.value === 'legacy')))
+
 const shownInvoices = computed(() =>
-  invProblemsOnly.value ? invoices.value.filter(i => invState(i).label !== '已上傳' && invState(i).label !== '已作廢') : invoices.value)
+  invProblemsOnly.value ? sourceInvoices.value.filter(i => !i.legacy && invState(i).label !== '已上傳' && invState(i).label !== '已作廢') : sourceInvoices.value)
+const legacyCount = computed(() => invSource.value === 'all' ? invoices.value.filter(i => i.legacy).length : 0)
+const legacyAmount = computed(() => invoices.value.filter(i => i.legacy && i.cancelStatus !== 'done').reduce((s, i) => s + Number(i.total), 0))
 
 const invStats = computed(() => {
-  const list = invoices.value
+  const list = sourceInvoices.value
   const live = list.filter(i => i.cancelStatus !== 'done')
   const count = (label: string) => list.filter(i => invState(i).label === label).length
   const waiting = count('待上傳') + count('作廢中')
@@ -594,10 +631,12 @@ const invStats = computed(() => {
   return [
     { label: '開立張數', value: `${list.length} 張`, color: 'text-gray-900' },
     { label: '發票金額（不含作廢）', value: '$' + live.reduce((s, i) => s + Number(i.total), 0).toLocaleString(), color: 'text-green-700' },
-    { label: '已上傳', value: `${count('已上傳')} 張`, color: 'text-green-700' },
+    invSource.value === 'legacy'
+      ? { label: '葆光（舊系統）', value: `${count('舊系統')} 張`, color: 'text-blue-700' }
+      : { label: '已上傳', value: `${count('已上傳')} 張`, color: 'text-green-700' },
     { label: '待上傳 / 有問題', value: `${waiting} / ${bad} 張`, color: bad ? 'text-red-600' : waiting ? 'text-amber-600' : 'text-gray-900' },
     { label: '作廢', value: `${count('已作廢')} 張`, color: 'text-gray-500' },
-    { label: '測試號碼（未開立）', value: `${mockInvCount.value} 張`, color: 'text-gray-400' },
+    { label: '測試號碼（未開立）', value: `${invSource.value === 'legacy' ? 0 : mockInvCount.value} 張`, color: 'text-gray-400' },
   ]
 })
 

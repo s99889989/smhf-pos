@@ -20,10 +20,6 @@
           <span class="w-full text-xs md:text-sm text-center truncate leading-tight"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
         </button>
-        <!-- 收銀站在「系統設定」選；沒設定時才在這裡小提示（已設定就不顯示） -->
-        <NuxtLink v-if="!station" to="/settings" class="ml-auto shrink-0 whitespace-nowrap self-center text-xs text-amber-600 hover:underline">
-          未設定收銀站（顯示全部品項）→ 設定
-        </NuxtLink>
       </div>
 
       <!-- 品項卡片 -->

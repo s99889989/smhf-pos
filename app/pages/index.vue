@@ -17,18 +17,14 @@
         <div v-if="!c"
              class="min-h-[3.25rem] rounded-xl"
              :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden lg:block'"
-             @dragover.prevent
-             @drop.prevent="dropCat(si + 1)" />
+             :data-drop="editLayout ? si + 1 : null" />
         <button
                 v-else
-                @click="pickCat(c)"
+                @click="!catDrag.justDragged() && pickCat(c)"
                 :title="categories.includes(c) ? c : c + '（這站沒有品項，平常這格是空的）'"
-                :style="categories.includes(c) ? undefined : 'opacity:.45'"
-                :draggable="editLayout && !catBusy"
-                @dragstart="dragCat = c"
-                @dragend="dragCat = ''"
-                @dragover.prevent
-                @drop.prevent="dropCat(si + 1)"
+                :style="(categories.includes(c) ? '' : 'opacity:.45;') + (editLayout ? 'touch-action:none' : '')"
+                :data-drop="editLayout ? si + 1 : null"
+                @pointerdown="editLayout && !catBusy && catDrag.down($event, c, c)"
                 class="min-w-0 min-h-[3.25rem] flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-xl border transition-colors"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
@@ -45,6 +41,9 @@
         </button>
         </template>
       </div>
+        <!-- 編輯排列：拖動分類時跟著滑鼠 / 手指的標籤 -->
+        <div v-if="catDrag.ghost.value" class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold shadow-lg whitespace-nowrap"
+             :style="{ left: catDrag.ghost.value.x + 12 + 'px', top: catDrag.ghost.value.y + 12 + 'px' }">{{ catDrag.ghost.value.label }}</div>
         <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
         <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
                 :title="editLayout ? '完成排列' : '編輯排列（拖動調整分類、品項位置）'"
@@ -1041,12 +1040,9 @@
   })
   const catTint = (name: string) => Math.max(0, categories.value.indexOf(name))
 
-  const dragCat = ref('')
-  function dropCat(n: number) {
-    const c = dragCat.value
-    dragCat.value = ''
-    if (c) placeCat(c, n)
-  }
+  // 拖動分類（pointer events：滑鼠、觸控都可以），放到第 n 格
+  const catDrag = usePointerDrag<string>((c, target) => placeCat(c, Number(target)))
+  const dragCat = computed(() => catDrag.dragging.value || '')
   // 把分類放到第 n 格；那格原本有分類就換到這個分類原本的格子。只存位置有變、或還沒存過的分類
   async function placeCat(c: string, n: number) {
     const from = catCellOf(c)

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-2 text-xs">
-      <span class="text-gray-500">{{ selected ? `已選「${selectedName}」：點一個格子放過去（有品項就互換）` : `大螢幕一排 ${COLS} 格，空格收銀台也會空著。點品項選起來，再點要放的格子；電腦也可以直接拖` }}</span>
+      <span class="text-gray-500">{{ selected ? `已選「${selectedName}」：點一個格子放過去（有品項就互換）` : `大螢幕一排 ${COLS} 格，空格收銀台也會空著。點品項選起來，再點要放的格子；也可以直接拖（滑鼠、觸控都可以）` }}</span>
       <button v-if="selected" @click="selected = null" class="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">取消選取</button>
       <span class="flex-1"></span>
       <button @click="compact" :disabled="busy" class="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50">去掉空格</button>
@@ -15,12 +15,10 @@
       <div v-for="n in rows * COLS" :key="n"
            class="relative overflow-hidden text-left border rounded-xl transition-colors select-none"
            :class="[cellClass(n), grid[n] ? 'bg-gray-100' : '']"
-           :draggable="!!grid[n]"
-           @dragstart="grid[n] && (dragId = grid[n]!.id)"
-           @dragend="dragId = null"
-           @click="clickCell(n)"
-           @dragover.prevent
-           @drop.prevent="dropCell(n)">
+           :data-drop="n"
+           :style="grid[n] ? 'touch-action:none' : ''"
+           @pointerdown="grid[n] && drag.down($event, grid[n]!.id, grid[n]!.name)"
+           @click="!drag.justDragged() && clickCell(n)">
         <div style="padding-top:80%"></div>
         <template v-if="grid[n]">
           <CatalogImg v-if="grid[n]!.image" :file="grid[n]!.image" :alt="grid[n]!.name" class="absolute inset-0 w-full h-full object-cover pointer-events-none" />
@@ -37,6 +35,10 @@
         <span class="absolute top-1 left-1.5 text-[10px] pointer-events-none" :class="grid[n] ? 'text-white' : 'text-gray-400'" :style="grid[n] ? 'text-shadow:0 1px 2px rgba(0,0,0,.8)' : ''">{{ n }}</span>
       </div>
     </div>
+
+    <!-- 拖動中跟著滑鼠 / 手指的標籤 -->
+    <div v-if="drag.ghost.value" class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold shadow-lg whitespace-nowrap"
+         :style="{ left: drag.ghost.value.x + 12 + 'px', top: drag.ghost.value.y + 12 + 'px' }">{{ drag.ghost.value.label }}</div>
   </div>
 </template>
 
@@ -44,14 +46,11 @@
 const props = defineProps<{ category: string }>()
 const COLS = LAYOUT_COLS
 
-const dragId = ref<number | null>(null)
 const { selected, busy, msg, msgErr, grid, placedCount, rows, selectedName, place: placeRaw, clickCell, compact, clearAll } = useLayoutEdit(() => props.category)
 
-function place(id: number, n: number) { dragId.value = null; placeRaw(id, n) }
-function dropCell(n: number) {
-  if (dragId.value) place(dragId.value, n)
-  dragId.value = null
-}
+// 拖到第 n 格放開：放過去（有品項就互換）
+const drag = usePointerDrag<number>((id, target) => placeRaw(id, Number(target)))
+const dragId = drag.dragging
 // 拖動或已選品項時：可以放的格子（空格、可以互換的品項）都顯示綠色虛線框
 function cellClass(n: number) {
   const p = grid.value[n]

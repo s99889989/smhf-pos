@@ -158,16 +158,21 @@ export function useCatalog() {
     // 分類有設站別：品項跟著分類（print-agent 1.16 也會這樣做）
     const catLocs = store.categories.value.find(c => c.name === (p.category || '').trim())?.locations
     if (catLocs) p = { ...p, locations: [...catLocs] }
+    const before = new Set(store.products.value.map(x => x.id))
     await mutate('product/save', p, () => {
       const list = store.products.value
       const idx = p.id ? list.findIndex(x => x.id === p.id) : -1
       if (idx >= 0) list[idx] = { ...list[idx]!, ...p, id: list[idx]!.id }
       else list.push({ ...p, id: Math.max(0, ...list.map(x => x.id)) + 1, image: '' })
     })
-    const saved = store.products.value.find(x => x.name === p.name.trim())
+    // 可以有同名品項（print-agent 1.24 起），用 id 找：編輯找原本的 id，新增找剛多出來的那個
+    const list = store.products.value
+    const saved = p.id ? list.find(x => x.id === p.id)
+      : (list.find(x => !before.has(x.id) && x.name === p.name.trim()) ?? [...list].reverse().find(x => x.name === p.name.trim()))
     // 下架要 print-agent 1.15 起才會存；舊版會默默丟掉（等於又上架）
     if (connected() && p.inactive && !saved?.inactive) throw new Error('資料機的 print-agent 還是舊版，要更新到 1.15 才能保存「下架」（其他內容已存好）')
     checkEmoji(p.emoji, saved?.emoji)
+    return saved?.id
   }
   const deleteProduct = (id: number) => mutate('product/delete', { id }, () => {
     store.products.value = store.products.value.filter(p => p.id !== id)

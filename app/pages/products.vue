@@ -623,13 +623,15 @@ async function saveProduct() {
     const name = form.value.name.trim()
     // 舊版 print-agent 存不了 emoji：品項其他內容已存好，圖片照樣上傳，最後再顯示提醒
     let warn = ''
+    let savedId: number | undefined
     try {
-      await cat.saveProduct({ ...form.value, name, id: editId.value, materials: form.value.materials.filter(m => m.materialId) })
+      savedId = await cat.saveProduct({ ...form.value, name, id: editId.value, materials: form.value.materials.filter(m => m.materialId) })
     } catch (e) {
       if (/要更新到 1\.1[456]/.test((e as Error).message)) warn = (e as Error).message
       else throw e
     }
-    const id = editId.value ?? products.value.find(p => p.name === name)?.id
+    // 可以有同名品項，不能用名稱找 id；只有舊版提醒走 catch 拿不到 savedId 時，才退回找最新那個同名的
+    const id = editId.value ?? savedId ?? [...products.value].reverse().find(p => p.name === name)?.id
     if (id && imageFile.value) await cat.setProductImage(id, imageFile.value)
     else if (id && imageRemoved.value) await cat.clearProductImage(id)
     if (warn) { formError.value = warn; editId.value = id ?? editId.value; imageFile.value = null; imageRemoved.value = false; return }

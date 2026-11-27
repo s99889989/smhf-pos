@@ -6,8 +6,10 @@
 
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
-      <!-- 排不下就換行，依內容自然長高（不設上限、不出捲軸） -->
-      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex flex-wrap gap-2 shrink-0">
+      <!-- 固定格子：一排最多 6 個（手機 4 個），排不下往下一排，依內容自然長高（不出捲軸） -->
+      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 shrink-0">
+      <div class="flex items-start gap-2">
+      <div class="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-6 gap-2">
         <button
                 v-for="(c, ci) in categories" :key="c"
                 @click="pickCat(c)"
@@ -17,7 +19,7 @@
                 @dragend="dragCat = ''"
                 @dragover.prevent
                 @drop.prevent="dropCat(c)"
-                class="shrink-0 min-w-[4.5rem] md:min-w-24 max-w-[8.5rem] md:max-w-[11rem] flex flex-col items-center gap-1 px-2 pt-2 pb-1.5 rounded-xl border transition-colors"
+                class="min-w-0 flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 rounded-xl border transition-colors"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
             : dragCat === c ? 'opacity-40 border-gray-200'
@@ -27,19 +29,21 @@
         >
           <span class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-xl md:text-2xl leading-none font-bold"
                 :class="CAT_TINTS[ci % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
-          <!-- 名稱長：按鈕跟著加寬（有上限），再長就換第二行，不截掉 -->
+          <!-- 名稱長就換第二行，不截掉 -->
           <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
         </button>
+      </div>
         <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
-        <div class="ml-auto self-center flex items-center gap-2">
-          <span v-if="editLayout && !catMsg" class="text-xs text-gray-400">分類可以直接拖動換位置</span>
-          <span v-if="catMsg" class="text-xs" :class="catMsgErr ? 'text-red-600' : 'text-blue-600'">{{ catMsg }}</span>
-          <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
-                  class="text-xs px-3 py-1.5 rounded-lg border whitespace-nowrap"
-                  :class="editLayout ? 'bg-green-700 border-green-700 text-white font-semibold' : 'border-gray-300 text-gray-500 hover:bg-gray-50'">
-            {{ editLayout ? '✓ 完成排列' : '✏️ 編輯排列' }}
-          </button>
+        <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
+                :title="editLayout ? '完成排列' : '編輯排列（拖動調整分類、品項位置）'"
+                class="shrink-0 text-xs px-2 py-1.5 rounded-lg border whitespace-nowrap"
+                :class="editLayout ? 'bg-green-700 border-green-700 text-white font-semibold' : 'border-gray-300 text-gray-500 hover:bg-gray-50'">
+          {{ editLayout ? '✓ 完成' : '✏️' }}
+        </button>
+      </div>
+        <div v-if="editLayout" class="mt-1.5 text-xs" :class="catMsgErr ? 'text-red-600' : catMsg ? 'text-blue-600' : 'text-gray-400'">
+          {{ catMsg || '編輯排列中：分類可以直接拖動換位置；點品項不會加進訂單' }}
         </div>
       </div>
 

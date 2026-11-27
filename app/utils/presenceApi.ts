@@ -217,6 +217,7 @@ export async function checkHub(): Promise<HubCheck> {
   if (res.status === 404) { r.dataMachine = 'old'; r.message = '資料機連得到，但資料機的 print-agent 要更新到 1.6'; return r }
   // 轉發失敗: Connection refused 等：pos-agent 在，但資料機本機 17891 沒開
   r.dataMachine = 'fail'
+  r.hint = '請到資料機：執行 print-agent 的停止 bat，工作管理員確認沒有 smhf-print-agent.exe，再重開 print-agent。pos-agent 資料夾的「檢查狀態.bat」可以直接看 17891 正不正常。'
   return r
 }
 

@@ -24,6 +24,11 @@
           </label>
           <span class="text-xs text-gray-400">共 {{ filteredProducts.length }} 項<template v-if="inactiveProducts.length">（另有 {{ inactiveProducts.length }} 項已下架）</template></span>
           <span v-if="orderMsg" class="text-xs text-blue-600">{{ orderMsg }}</span>
+          <!-- 品項清單 / 收銀排列（像舊 POS 的固定格子，可以留空格） -->
+          <div class="inline-flex rounded-xl border border-gray-300 overflow-hidden text-sm">
+            <button @click="view = 'list'" class="px-3 py-1.5" :class="view === 'list' ? 'bg-green-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'">品項清單</button>
+            <button @click="view = 'layout'" class="px-3 py-1.5 border-l border-gray-300" :class="view === 'layout' ? 'bg-green-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'">收銀排列</button>
+          </div>
         </div>
         <span v-if="catState.mode === 'demo'" class="text-xs text-amber-600">範例模式：連不到資料機，修改不會保存</span>
         <span v-else-if="catState.offline" class="text-xs text-amber-600">平板離線中，不能修改品項</span>
@@ -41,7 +46,12 @@
     <!-- 品項卡片：手機一欄，越寬欄數越多 -->
     <div class="flex-1 overflow-auto px-4 md:px-6 py-4">
 
-      <div ref="prodCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2.5">
+      <template v-if="view === 'layout'">
+        <PosLayoutEditor v-if="filterCat && filterCat !== NO_CAT" :key="filterCat" :category="filterCat" />
+        <p v-else class="text-sm text-gray-500 text-center py-10">收銀排列是一個分類一個分類排：請先在上面「分類」選一個分類</p>
+      </template>
+
+      <div v-show="view === 'list'" ref="prodCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2.5">
         <!-- 上架的在前面（可拖動排序），下架的接在後面另起一區、顏色淡一點 -->
         <template v-for="(prod, i) in cardList" :key="prod.id">
         <div v-if="i === prodView.length && inactiveProducts.length" class="col-span-full flex items-center gap-3 mt-4 mb-1">
@@ -308,6 +318,9 @@ const cat = useCatalog()
 const catState = cat.state
 
 const filterCat = ref('')   // '' = 全部，NO_CAT = 未分類，其他 = 分類名稱
+const view = ref<'list' | 'layout'>('list') // 品項清單 / 收銀排列
+// 收銀排列要一個分類一個分類排：切過去時還沒選分類就先選第一個
+watch(view, v => { if (v === 'layout' && (!filterCat.value || filterCat.value === NO_CAT) && categoryList.value.length) filterCat.value = categoryList.value[0]!.name })
 const search    = ref('')   // 關鍵字：比對品名、備註、分類（不分大小寫，空白隔開＝每個字都要有）
 const NO_CAT = '\u0000none'
 

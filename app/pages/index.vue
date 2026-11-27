@@ -26,24 +26,29 @@
       </div>
 
       <!-- 品項卡片 -->
-      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2 md:gap-2.5 content-start">
+      <!-- 這個分類在品項管理「收銀排列」排過格子：大螢幕固定 6 欄、照格子位置放（中間可留空）；小螢幕照順序排、不留空 -->
+      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2 md:gap-2.5 content-start"
+           :class="layoutOn ? 'lg:grid-cols-6' : 'lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
+        <template v-for="(prod, si) in productSlots" :key="prod ? prod.id : 'gap' + si">
+        <div v-if="!prod" class="hidden lg:block" />
         <button
-                v-for="prod in filteredProducts" :key="prod.id"
+                v-else
                 @click="addItem(prod)"
                 @pointerdown="lastPointer = $event.pointerType"
                 @contextmenu.prevent="removeOne(prod)"
                 @wheel="wheelCard($event, prod)"
                 class="relative flex flex-col justify-start text-left bg-white border rounded-xl p-2.5 md:p-3 active:scale-95 transition-all"
-                :class="prod.cashOnly && curPay !== 'cash'
+                :class="[layoutOn ? 'lg:p-1.5 min-h-[4.5rem]' : '', prod.cashOnly && curPay !== 'cash'
             ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400'
-            : 'border-gray-200 hover:border-green-500 hover:bg-green-50'"
+            : 'border-gray-200 hover:border-green-500 hover:bg-green-50']"
         >
           <span v-if="cartQty(prod.id)" class="absolute top-2 right-2 z-10 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {{ cartQty(prod.id) }}
           </span>
           <!-- 圖片區：每張卡片都有，大小一致（4:3）。有圖放圖（資料機縮圖），沒圖或載不到就放 emoji，再沒有就放品名第一個字。
                用 padding-top 撐出 4:3，XP 的 Mypal 不支援 aspect-ratio -->
-          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
+          <!-- 收銀排列（6 欄）的分類格子比較窄：不放圖，只放品名和價錢，跟舊 POS 的按鈕一樣 -->
+          <div v-if="!layoutOn" class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
             <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
                         class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
             <div v-else class="absolute inset-0 flex items-center justify-center">
@@ -51,15 +56,16 @@
               <span v-else class="text-4xl font-bold text-gray-300 leading-none">{{ prod.name.slice(0, 1) }}</span>
             </div>
           </div>
-          <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
-          <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
-          <div v-else class="flex items-baseline gap-1.5">
-            <div class="text-base font-bold text-green-700">${{ discountedPrice(prod.price) }}</div>
+          <div class="font-medium text-gray-900 leading-snug" :class="layoutOn ? 'text-sm lg:text-xs mb-1 break-words' : 'text-sm mb-1.5'">{{ prod.name }}</div>
+          <div v-if="prod.openPrice" class="font-bold text-orange-600" :class="layoutOn ? 'text-sm lg:text-xs' : 'text-base'">✏️ 時價</div>
+          <div v-else class="flex flex-wrap items-baseline gap-x-1.5">
+            <div class="font-bold text-green-700" :class="layoutOn ? 'text-sm' : 'text-base'">${{ discountedPrice(prod.price) }}</div>
             <div v-if="curDiscount && curDiscount.rate < 1" class="text-xs text-gray-400 line-through">${{ prod.price }}</div>
           </div>
-          <div v-if="prod.note" class="text-xs text-gray-400 mt-0.5">{{ prod.note }}</div>
-          <div v-if="prod.cashOnly" class="text-xs text-amber-600 mt-1 font-medium">💵 限現金</div>
+          <div v-if="prod.note && !layoutOn" class="text-xs text-gray-400 mt-0.5">{{ prod.note }}</div>
+          <div v-if="prod.cashOnly" class="text-xs text-amber-600 mt-1 font-medium">💵<template v-if="!layoutOn"> 限現金</template></div>
         </button>
+        </template>
         <div v-if="!filteredProducts.length" class="col-span-full flex items-center justify-center py-20 text-gray-400 text-sm">
           此地點沒有此分類的品項
         </div>
@@ -954,6 +960,18 @@
   const filteredProducts = computed(() =>
           locProducts.value.filter(p => (p.category || '其他') === activeCat.value)
   )
+  // 收銀排列（品項管理設定的格子位置，cell 從 1 起算）：排過的照格子放，中間空的格子放 null；沒排的接在最後面
+  const layoutOn = computed(() => filteredProducts.value.some(p => (p.cell || 0) > 0))
+  const productSlots = computed<(Product | null)[]>(() => {
+    if (!layoutOn.value) return filteredProducts.value
+    const placed = filteredProducts.value.filter(p => (p.cell || 0) > 0).sort((a, b) => a.cell! - b.cell! || a.sortOrder - b.sortOrder)
+    const out: (Product | null)[] = []
+    for (const p of placed) {
+      while (out.length < p.cell! - 1) out.push(null)
+      out.push(p)
+    }
+    return out.concat(filteredProducts.value.filter(p => !((p.cell || 0) > 0)))
+  })
   const subtotal = computed(() => cart.value.reduce((s, i) => s + i.price * i.qty, 0))
   const total    = computed(() => cart.value.reduce((s, i) => s + i.finalPrice * i.qty, 0))
 

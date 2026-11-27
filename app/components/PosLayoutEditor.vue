@@ -1,14 +1,7 @@
 <template>
-  <div>
-    <div class="flex flex-wrap items-center gap-2 mb-2 text-xs">
-      <span class="text-gray-500">{{ selected ? `已選「${selectedName}」：點一個格子放過去（有品項就互換）` : `大螢幕一排 ${COLS} 格，空格收銀台也會空著。點品項選起來，再點要放的格子；也可以直接拖（滑鼠、觸控都可以）` }}</span>
-      <button v-if="selected" @click="selected = null" class="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">取消選取</button>
-      <span class="flex-1"></span>
-      <button @click="compact" :disabled="busy" class="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50">去掉空格</button>
-      <button v-if="placedCount" @click="clearAll" :disabled="busy" class="px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50">還原自動排</button>
-    </div>
-    <!-- 固定留一行高，訊息出現 / 消失時格子不會跳 -->
-    <p class="text-xs mb-2 min-h-[1rem]" :class="msgErr ? 'text-red-600' : 'text-blue-600'">{{ msg }}</p>
+  <div class="relative">
+    <!-- 說明文字、按鈕都拿掉了，只在儲存中 / 失敗時浮一行小字在右上角（不佔版面） -->
+    <p v-if="msg" class="absolute -top-2.5 right-0 z-10 text-xs px-2 py-0.5 rounded bg-white border border-gray-200 shadow-sm" :class="msgErr ? 'text-red-600' : 'text-blue-600'">{{ msg }}</p>
 
     <!-- 格子：固定 COLS 欄；卡片跟收銀台的一模一樣（圖片當底圖、品名價錢疊在下面，寬:高 = 5:4），空格子一樣大 -->
     <div class="grid gap-2 md:gap-2.5" :style="{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }">
@@ -42,7 +35,7 @@
 const props = defineProps<{ category: string }>()
 const COLS = LAYOUT_COLS
 
-const { selected, busy, msg, msgErr, grid, placedCount, rows, selectedName, place: placeRaw, clickCell, compact, clearAll } = useLayoutEdit(() => props.category)
+const { selected, msg, msgErr, grid, rows, place: placeRaw, clickCell } = useLayoutEdit(() => props.category)
 
 // 拖到第 n 格放開：放過去（有品項就互換）
 const drag = usePointerDrag<number>((id, target) => placeRaw(id, Number(target)))

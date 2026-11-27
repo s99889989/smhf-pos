@@ -17,8 +17,8 @@
       <span class="text-xs text-gray-400 tabular-nums mr-1">{{ shortTime }}</span>
     </header>
 
-    <!-- 手機選單（從左邊滑出）；點遮罩或換頁就關 -->
-    <div v-if="mobileNavOpen" class="md:hidden fixed inset-0 z-50">
+    <!-- 手機選單（從左邊滑出）；點遮罩或換頁就關。收銀頁在平板、電腦也用這個（左側選單欄不顯示，點分類列左上角的 ☰ 打開） -->
+    <div v-if="mobileNavOpen" class="fixed inset-0 z-50" :class="isCashier ? '' : 'md:hidden'">
       <div class="absolute inset-0 bg-black/40" @click="mobileNavOpen = false"></div>
       <div class="absolute top-0 bottom-0 left-0 w-72 bg-white shadow-2xl flex flex-col" style="max-width:85vw">
         <div class="flex items-center border-b border-gray-200 h-12 px-3 gap-2 shrink-0">
@@ -50,7 +50,8 @@
       </div>
     </div>
 
-    <aside class="bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 transition-all duration-200" :class="sidebarCollapsed ? 'w-14' : 'w-56'">
+    <!-- 左側選單欄：收銀頁不顯示，讓出空間給品項（改從收銀頁分類列左上角的 ☰ 打開上面那個抽屜） -->
+    <aside v-if="!isCashier" class="bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 transition-all duration-200" :class="sidebarCollapsed ? 'w-14' : 'w-56'">
 
       <!-- Logo -->
       <!-- 收合時：只留一個置中的按鈕，平常顯示葉子，滑過時換成選單圖示，點了展開 -->
@@ -213,7 +214,9 @@ watch(sidebarCollapsed, hideTip)
 watch(() => route.path, hideTip)
 
 // 手機選單：換頁就收起來
-const mobileNavOpen = ref(false)
+// 抽屜選單開關：收銀頁的 ☰ 按鈕（pages/index.vue）也會打開它
+const mobileNavOpen = useState('navDrawerOpen', () => false)
+const isCashier = computed(() => route.path === '/')
 watch(() => route.path, () => { mobileNavOpen.value = false })
 const currentItem = computed(() => navSections.flatMap(s => s.items).find(i => isActive(i.to)))
 

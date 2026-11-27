@@ -10,36 +10,31 @@
     <!-- 固定留一行高，訊息出現 / 消失時格子不會跳 -->
     <p class="text-xs mb-2 min-h-[1rem]" :class="msgErr ? 'text-red-600' : 'text-blue-600'">{{ msg }}</p>
 
-    <!-- 格子：固定 COLS 欄；卡片跟收銀台的一模一樣（大小、圖片 4:3、品名、價錢），空格子用同樣的骨架撐出一樣大小 -->
+    <!-- 格子：固定 COLS 欄；卡片跟收銀台的一模一樣（圖片當底圖、品名價錢疊在下面，寬:高 = 5:4），空格子一樣大 -->
     <div class="grid gap-2 md:gap-2.5" :style="{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }">
       <div v-for="n in rows * COLS" :key="n"
-           class="relative flex flex-col justify-start text-left border rounded-xl p-2.5 md:p-3 transition-colors select-none"
-           :class="cellClass(n)"
+           class="relative overflow-hidden text-left border rounded-xl transition-colors select-none"
+           :class="[cellClass(n), grid[n] ? 'bg-gray-100' : '']"
            :draggable="!!grid[n]"
            @dragstart="grid[n] && (dragId = grid[n]!.id)"
            @dragend="dragId = null"
            @click="clickCell(n)"
            @dragover.prevent
            @drop.prevent="dropCell(n)">
-        <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl pt-[50%] xl:pt-[75%]" :class="grid[n] ? 'bg-gray-100' : ''">
-          <template v-if="grid[n]">
-            <CatalogImg v-if="grid[n]!.image" :file="grid[n]!.image" :alt="grid[n]!.name" class="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-            <div v-else class="absolute inset-0 flex items-center justify-center">
-              <span v-if="grid[n]!.emoji" class="text-5xl leading-none">{{ grid[n]!.emoji }}</span>
-              <span v-else class="text-4xl font-bold text-gray-300 leading-none">{{ grid[n]!.name.slice(0, 1) }}</span>
-            </div>
-          </template>
-          <span class="absolute top-1 left-1.5 text-[10px] text-gray-400">{{ n }}</span>
-        </div>
+        <div style="padding-top:80%"></div>
         <template v-if="grid[n]">
-          <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ grid[n]!.name }}</div>
-          <div v-if="grid[n]!.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
-          <div v-else class="text-base font-bold text-green-700">${{ grid[n]!.price }}</div>
+          <CatalogImg v-if="grid[n]!.image" :file="grid[n]!.image" :alt="grid[n]!.name" class="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+          <div v-else class="absolute inset-x-0 top-0 bottom-8 flex items-center justify-center pointer-events-none">
+            <span v-if="grid[n]!.emoji" class="text-4xl xl:text-5xl leading-none">{{ grid[n]!.emoji }}</span>
+            <span v-else class="text-3xl xl:text-4xl font-bold text-gray-300 leading-none">{{ grid[n]!.name.slice(0, 1) }}</span>
+          </div>
+          <div class="absolute inset-x-0 bottom-0 px-2 xl:px-2.5 pt-5 pb-1.5 xl:pb-2 pointer-events-none" style="background:linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,.55) 65%, rgba(0,0,0,0)); color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.7)">
+            <div class="text-xs xl:text-sm font-semibold leading-tight line-clamp-2">{{ grid[n]!.name }}</div>
+            <div v-if="grid[n]!.openPrice" class="text-sm xl:text-base font-bold mt-0.5" style="color:#fdba74">✏️ 時價</div>
+            <div v-else class="text-sm xl:text-base font-bold mt-0.5" style="color:#86efac">${{ grid[n]!.price }}</div>
+          </div>
         </template>
-        <template v-else>
-          <div class="text-sm leading-snug mb-1.5 invisible">空</div>
-          <div class="text-base invisible">空</div>
-        </template>
+        <span class="absolute top-1 left-1.5 text-[10px] pointer-events-none" :class="grid[n] ? 'text-white' : 'text-gray-400'" :style="grid[n] ? 'text-shadow:0 1px 2px rgba(0,0,0,.8)' : ''">{{ n }}</span>
       </div>
     </div>
   </div>
@@ -61,8 +56,8 @@ function dropCell(n: number) {
 function cellClass(n: number) {
   const p = grid.value[n]
   const moving = dragId.value || selected.value
-  if (p && p.id === moving) return dragId.value ? 'opacity-40 border-gray-200 bg-white' : 'border-green-600 ring-1 ring-green-600 bg-green-50'
-  if (p) return moving ? 'border-dashed border-green-400 bg-white cursor-pointer' : 'border-gray-200 bg-white hover:border-green-500 cursor-pointer'
+  if (p && p.id === moving) return dragId.value ? 'opacity-40 border-gray-200' : 'border-green-600 ring-1 ring-green-600 bg-green-50'
+  if (p) return moving ? 'border-dashed border-green-400 cursor-pointer' : 'border-gray-200 hover:border-green-500 cursor-pointer'
   return moving ? 'border-dashed border-green-400 bg-green-50/30 hover:bg-green-50 cursor-pointer' : 'border-dashed border-gray-200'
 }
 </script>

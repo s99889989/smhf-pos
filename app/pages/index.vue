@@ -6,15 +6,15 @@
 
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
-      <!-- 固定格子：一排 6 格（手機 4 格），分類放在自己的格子（分類的排序數字 = 格子編號），中間可以留空；
+      <!-- 固定格子：一排 8 格（方塊壓扁、圖示縮小，兩排放得下 16 個；小螢幕 3～4 格、不留空），分類放在自己的格子（分類的排序數字 = 格子編號），中間可以留空；
            編輯排列時空格子顯示虛線框，可以把分類拖過去（拖到別的分類上就互換） -->
       <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 shrink-0">
       <div class="flex items-start gap-2">
-      <div class="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-6 gap-2">
+      <div class="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 xl:gap-2">
         <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
         <div v-if="!c"
-             class="min-h-[3.75rem] xl:min-h-[4.5rem] rounded-xl"
-             :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden sm:block'"
+             class="min-h-[3.25rem] rounded-xl"
+             :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden lg:block'"
              @dragover.prevent
              @drop.prevent="dropCat(si + 1)" />
         <button
@@ -27,7 +27,7 @@
                 @dragend="dragCat = ''"
                 @dragover.prevent
                 @drop.prevent="dropCat(si + 1)"
-                class="min-w-0 flex flex-col items-center gap-1 px-1 pt-1.5 xl:pt-2 pb-1 xl:pb-1.5 rounded-xl border transition-colors"
+                class="min-w-0 min-h-[3.25rem] flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-xl border transition-colors"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
             : dragCat === c ? 'opacity-40 border-gray-200'
@@ -35,7 +35,7 @@
             ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
-          <span class="w-8 h-8 xl:w-10 xl:h-10 rounded-lg flex items-center justify-center text-lg xl:text-2xl leading-none font-bold"
+          <span class="shrink-0 w-6 h-6 xl:w-7 xl:h-7 rounded-md flex items-center justify-center text-sm xl:text-base leading-none font-bold"
                 :class="CAT_TINTS[catTint(c) % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
           <!-- 名稱長就換第二行，不截掉 -->
           <span class="w-full text-xs xl:text-sm text-center line-clamp-2 leading-tight break-words"
@@ -74,33 +74,35 @@
                 @pointerdown="lastPointer = $event.pointerType"
                 @contextmenu.prevent="removeOne(prod)"
                 @wheel="wheelCard($event, prod)"
-                class="relative flex flex-col justify-start text-left bg-white border rounded-xl p-2.5 md:p-3 active:scale-95 transition-all"
+                class="relative overflow-hidden text-left bg-gray-100 border rounded-xl active:scale-95 transition-all"
                 :class="[prod.cashOnly && curPay !== 'cash'
-            ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400'
-            : 'border-gray-200 hover:border-green-500 hover:bg-green-50']"
+            ? 'border-amber-400 hover:border-amber-500'
+            : 'border-gray-200 hover:border-green-500']"
         >
-          <span v-if="cartQty(prod.id)" class="absolute top-2 right-2 z-10 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+          <!-- 圖片當整張卡片的底圖，品名、價錢疊在下方的深色漸層上（省掉下半部的文字區）。
+               沒圖或載不到就放 emoji，再沒有放品名第一個字。高度用 padding-top 撐（寬:高 = 5:4），XP 的 Mypal 不支援 aspect-ratio -->
+          <div style="padding-top:80%"></div>
+          <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
+                      class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
+          <div v-else class="absolute inset-x-0 top-0 bottom-8 flex items-center justify-center">
+            <span v-if="prod.emoji" class="text-4xl xl:text-5xl leading-none">{{ prod.emoji }}</span>
+            <span v-else class="text-3xl xl:text-4xl font-bold text-gray-300 leading-none">{{ prod.name.slice(0, 1) }}</span>
+          </div>
+          <span v-if="cartQty(prod.id)" class="absolute top-1.5 right-1.5 z-10 bg-green-700 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
             {{ cartQty(prod.id) }}
           </span>
-          <!-- 圖片區：每張卡片都有，大小一致（4:3）。有圖放圖（資料機縮圖），沒圖或載不到就放 emoji，再沒有就放品名第一個字。
-               用 padding-top 撐出 4:3，XP 的 Mypal 不支援 aspect-ratio -->
-          <!-- 1024 寬的收銀機（XP）：圖片高度減半（2:1），一排放得下 5 張；大螢幕照舊 4:3 -->
-          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100 pt-[50%] xl:pt-[75%]">
-            <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
-                        class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
-            <div v-else class="absolute inset-0 flex items-center justify-center">
-              <span v-if="prod.emoji" class="text-5xl leading-none">{{ prod.emoji }}</span>
-              <span v-else class="text-4xl font-bold text-gray-300 leading-none">{{ prod.name.slice(0, 1) }}</span>
+          <div class="absolute inset-x-0 bottom-0 px-2 xl:px-2.5 pt-5 pb-1.5 xl:pb-2" style="background:linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,.55) 65%, rgba(0,0,0,0)); color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.7)">
+            <div class="text-xs xl:text-sm font-semibold leading-tight line-clamp-2">{{ prod.name }}</div>
+            <div class="flex flex-wrap items-baseline gap-x-1.5 mt-0.5">
+              <span v-if="prod.openPrice" class="text-sm xl:text-base font-bold" style="color:#fdba74">✏️ 時價</span>
+              <template v-else>
+                <span class="text-sm xl:text-base font-bold" style="color:#86efac">${{ discountedPrice(prod.price) }}</span>
+                <span v-if="curDiscount && curDiscount.rate < 1" class="text-xs line-through" style="color:#d1d5db">${{ prod.price }}</span>
+              </template>
+              <span v-if="prod.cashOnly" class="text-xs font-medium" style="color:#fcd34d" title="限現金">💵</span>
             </div>
+            <div v-if="prod.note" class="text-[11px] leading-tight truncate" style="color:#d1d5db">{{ prod.note }}</div>
           </div>
-          <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
-          <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
-          <div v-else class="flex flex-wrap items-baseline gap-x-1.5">
-            <div class="text-base font-bold text-green-700">${{ discountedPrice(prod.price) }}</div>
-            <div v-if="curDiscount && curDiscount.rate < 1" class="text-xs text-gray-400 line-through">${{ prod.price }}</div>
-          </div>
-          <div v-if="prod.note" class="text-xs text-gray-400 mt-0.5">{{ prod.note }}</div>
-          <div v-if="prod.cashOnly" class="text-xs text-amber-600 mt-1 font-medium">💵 限現金</div>
         </button>
         </template>
         <div v-if="!filteredProducts.length" class="col-span-full flex items-center justify-center py-20 text-gray-400 text-sm">
@@ -1006,7 +1008,7 @@
   const catMsg = ref('')
   const catMsgErr = ref(false)
   // ---- 分類格子 ----
-  // 分類的排序數字（sortOrder）就是格子編號（1 起算、一排 6 格），中間沒用到的數字就是空格。
+  // 分類的排序數字（sortOrder）就是格子編號（1 起算、一排 8 格），中間沒用到的數字就是空格。
   // 數字不合法或重複的分類，接在最後面（第一次拖動時一起存成實際位置）。格子算全部分類，這站沒有的分類那格在這站是空的
   const catCells = computed(() => {
     const all = categoryList.value.map(c => ({ name: c.name, so: Number(c.sortOrder) || 0 }))
@@ -1026,7 +1028,7 @@
   const catSlots = computed<(string | null)[]>(() => {
     const shown = new Set(categories.value)
     const max = Math.max(0, ...Object.keys(catCells.value).map(Number).filter(k => shown.has(catCells.value[k]!)))
-    const total = editLayout.value ? Math.max(18, Math.ceil(Math.max(...Object.keys(catCells.value).map(Number), 0) / 6) * 6 + 6) : max
+    const total = editLayout.value ? Math.max(16, Math.ceil(Math.max(...Object.keys(catCells.value).map(Number), 0) / 8) * 8 + 8) : max
     const out: (string | null)[] = []
     for (let k = 1; k <= total; k++) {
       const n = catCells.value[k]

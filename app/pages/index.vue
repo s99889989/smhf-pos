@@ -6,8 +6,8 @@
 
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
-      <!-- 排不下就換行，最多露出兩排，再多就在這區上下捲 -->
-      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex flex-wrap gap-2 overflow-y-auto max-h-[12rem] md:max-h-[13rem] shrink-0">
+      <!-- 排不下就換行，依內容自然長高（不設上限、不出捲軸） -->
+      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex flex-wrap gap-2 shrink-0">
         <button
                 v-for="(c, ci) in categories" :key="c"
                 @click="pickCat(c)"

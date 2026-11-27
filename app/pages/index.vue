@@ -25,7 +25,7 @@
                 :style="(categories.includes(c) ? '' : 'opacity:.45;') + (editLayout ? 'touch-action:none' : '')"
                 :data-drop="editLayout ? si + 1 : null"
                 @pointerdown="editLayout && !catBusy && catDrag.down($event, c, c)"
-                class="min-w-0 min-h-[3.25rem] flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-xl border transition-colors"
+                class="min-w-0 min-h-[3.25rem] flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-xl border transition-colors select-none"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
             : dragCat === c ? 'opacity-40 border-gray-200'
@@ -41,9 +41,6 @@
         </button>
         </template>
       </div>
-        <!-- 編輯排列：拖動分類時跟著滑鼠 / 手指的標籤 -->
-        <div v-if="catDrag.ghost.value" class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold shadow-lg whitespace-nowrap"
-             :style="{ left: catDrag.ghost.value.x + 12 + 'px', top: catDrag.ghost.value.y + 12 + 'px' }">{{ catDrag.ghost.value.label }}</div>
         <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
         <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
                 :title="editLayout ? '完成排列' : '編輯排列（拖動調整分類、品項位置）'"

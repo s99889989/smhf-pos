@@ -35,10 +35,6 @@
         <span class="absolute top-1 left-1.5 text-[10px] pointer-events-none" :class="grid[n] ? 'text-white' : 'text-gray-400'" :style="grid[n] ? 'text-shadow:0 1px 2px rgba(0,0,0,.8)' : ''">{{ n }}</span>
       </div>
     </div>
-
-    <!-- 拖動中跟著滑鼠 / 手指的標籤 -->
-    <div v-if="drag.ghost.value" class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold shadow-lg whitespace-nowrap"
-         :style="{ left: drag.ghost.value.x + 12 + 'px', top: drag.ghost.value.y + 12 + 'px' }">{{ drag.ghost.value.label }}</div>
   </div>
 </template>
 

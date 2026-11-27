@@ -12,9 +12,7 @@
       <div class="flex items-start gap-2">
         <!-- 平板、電腦不顯示左側選單欄：從這裡打開選單 -->
         <NavMenuButton class="mt-1" />
-      <!-- 平常只露兩排，多的在這區上下捲（高度量第一格算出來：2 格 + 間距）；編輯排列時全部展開方便拖 -->
-      <div ref="catGridEl" class="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 xl:gap-2"
-           :style="!editLayout && catMaxH ? { maxHeight: catMaxH + 'px', overflowY: 'auto' } : undefined">
+      <div class="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 xl:gap-2">
         <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
         <!-- 分類按鈕、空格都是正方形（padding-top:100% 撐高，XP 的 Mypal 不支援 aspect-ratio），名稱換行也不會變形 -->
         <div v-if="!c"
@@ -1042,20 +1040,6 @@
     return out
   })
   const catTint = (name: string) => Math.max(0, categories.value.indexOf(name))
-
-  // 分類區只露兩排：量第一格的高度（正方形，跟著寬度變），算出兩排的高度。XP 的 Mypal 沒有 ResizeObserver，改聽視窗大小
-  const catGridEl = ref<HTMLElement | null>(null)
-  const catMaxH = ref(0)
-  function measureCats() {
-    const el = catGridEl.value
-    const first = el?.firstElementChild as HTMLElement | null
-    if (!el || !first) return
-    const gap = parseFloat(getComputedStyle(el).rowGap || '0') || 0
-    catMaxH.value = Math.ceil(first.offsetHeight * 2 + gap)
-  }
-  onMounted(() => { measureCats(); window.addEventListener('resize', measureCats) })
-  onBeforeUnmount(() => window.removeEventListener('resize', measureCats))
-  watch([catSlots, editLayout], () => nextTick(measureCats))
 
   // 拖動分類（pointer events：滑鼠、觸控都可以），放到第 n 格
   const catDrag = usePointerDrag<string>((c, target) => placeCat(c, Number(target)))

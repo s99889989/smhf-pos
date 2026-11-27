@@ -239,3 +239,19 @@
   /* 管理頁的表格：手機上不硬擠成一字一行，維持可讀寬度、左右滑動看（外層都有 overflow-auto） */
   table.w-full { min-width: 36rem; }
 }
+
+/* 帳單瀏覽、電子發票：表格與卡片的文字整體大一號（ReportsView 內容區加 class="text-up"） */
+.text-up {
+  --text-xs: 0.875rem; --text-xs--line-height: calc(1.25 / 0.875);
+  --text-sm: 1rem; --text-sm--line-height: 1.5;
+  --text-base: 1.125rem; --text-base--line-height: calc(1.75 / 1.125);
+  --text-lg: 1.25rem; --text-lg--line-height: calc(1.75 / 1.25);
+}
+@media screen and (min-width: 1024px) and (pointer: fine) {
+  .text-up {
+    --text-xs: 1rem; --text-xs--line-height: 1.5;
+    --text-sm: 1.125rem; --text-sm--line-height: calc(1.75 / 1.125);
+    --text-base: 1.25rem; --text-base--line-height: calc(1.75 / 1.25);
+    --text-lg: 1.5rem; --text-lg--line-height: calc(2 / 1.5);
+  }
+}

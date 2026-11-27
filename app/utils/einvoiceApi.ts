@@ -119,8 +119,9 @@ export interface InvoiceRecord {
   payNote?: string // 舊系統「備註說明」：現收、信用卡、宅配匯款…
 }
 /** 營業報表用：資料機上 from～to（yyyy-MM-dd，含）開立的發票和上傳 / 作廢狀態，含平板同步來的。一次最多兩個月。 */
-export const listEInvoices = (from: string, to: string) =>
-  call<{ from: string; to: string; invoices: InvoiceRecord[]; truncated: boolean; legacyLive?: boolean; legacyError?: string | null }>('POST', 'list', { from, to }, 40000)
+// refresh = true：資料機不用暫存的葆光資料，重查一次（print-agent 1.23 起有暫存）
+export const listEInvoices = (from: string, to: string, refresh = false) =>
+  call<{ from: string; to: string; invoices: InvoiceRecord[]; truncated: boolean; legacyLive?: boolean; legacyError?: string | null; legacyCachedAt?: string; legacyCached?: boolean }>('POST', 'list', { from, to, refresh }, 40000)
 export const runEInvoiceQueue = () => call<any>('POST', 'run', {}, 120000)
 /** 向加值中心查一張發票的狀態 */
 export const queryEInvoice = (invoiceNo: string) =>

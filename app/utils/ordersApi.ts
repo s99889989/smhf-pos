@@ -129,3 +129,27 @@ export async function editOrder(o: { clientId: string; day: string; changes: Rec
   if (!res.ok || !data?.ok) return { ok: false, message: errorText(data, res.status) }
   return { ok: true }
 }
+
+/** 葆光舊系統（BK0220 帳單瀏覽）的一張帳單，資料機 print-agent 1.20 直查 BKSQL.dbo.OCHECK */
+export interface LegacyCheck {
+  opDate: string // yyyy-MM-dd 營業日期
+  checkDate: string
+  fileDate: string // yyyy-MM-dd HH:mm:ss 建檔時間
+  updDate?: string // 更修時間（1.22 起）
+  RNo?: string // 序號（1.22 起）
+  ShiftID: string; CheckNo: string; BillTime: string; PayType: string; CustNo: string
+  UserID: string; POSID: string; posName: string; Remark: string; VIPNo: string; DelMark: string
+  CustTotal: number; OrderAmt: number; Service: number; Tax: number; Discount: number; DeductAmt: number
+  CheckAmt: number; CashAmt: number; PayAmt1: number; PayAmt2: number; PayAmt3: number; PayAmt4: number; PrePayAmt: number
+}
+
+/** 查資料機上葆光舊系統 from～to（yyyy-MM-dd，含）的帳單 */
+export async function listLegacyChecks(from: string, to: string, refresh = false): Promise<{ ok: true; checks: LegacyCheck[]; truncated: boolean; cached?: boolean; cachedAt?: string } | { ok: false; message: string }> {
+  // refresh = true：資料機不用暫存，重查葆光（print-agent 1.23 起有暫存）
+  const { res, error } = await post('legacy', { from, to, refresh }, 40000)
+  if (!res) return { ok: false, message: error }
+  const data = await res.json().catch(() => null)
+  if (res.status === 404 && (!data?.message || String(data.message).includes('沒有這個功能'))) return { ok: false, message: '資料機的 print-agent 還沒更新到 1.20' }
+  if (!res.ok || !data?.ok) return { ok: false, message: errorText(data, res.status) }
+  return data
+}

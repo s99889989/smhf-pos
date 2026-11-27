@@ -185,7 +185,7 @@ const navSections = [
     label: '報表',
     items: [
       { to: '/reports',     icon: '📊', label: '營業報表' },
-      { to: '/transactions', icon: '🧾', label: '交易紀錄' },
+      { to: '/transactions', icon: '🧾', label: '帳單瀏覽' },
       { to: '/invoices',    icon: '🧧', label: '電子發票' },
     ],
   },

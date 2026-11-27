@@ -230,6 +230,14 @@ function updateClock() {
     now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
 }
 onMounted(() => { updateClock(); setInterval(updateClock, 1000) })
+// 小螢幕（不到 1280 寬，例如 1024 的 XP 收銀機）：側欄預設收起，讓收銀畫面寬一點。只自動收一次，之後照使用者自己按的
+onMounted(() => {
+  try {
+    if (localStorage.getItem('pos-sidebar-auto')) return
+    localStorage.setItem('pos-sidebar-auto', '1')
+  } catch { return }
+  if (window.innerWidth < 1280) sidebarCollapsed.value = true
+})
 </script>
 
 <style scoped>

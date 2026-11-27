@@ -13,20 +13,21 @@
       <div class="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-6 gap-2">
         <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
         <div v-if="!c"
-             class="min-h-[4.5rem] rounded-xl"
+             class="min-h-[3.75rem] xl:min-h-[4.5rem] rounded-xl"
              :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden sm:block'"
              @dragover.prevent
              @drop.prevent="dropCat(si + 1)" />
         <button
                 v-else
                 @click="pickCat(c)"
-                :title="c"
+                :title="categories.includes(c) ? c : c + '（這站沒有品項，平常這格是空的）'"
+                :style="categories.includes(c) ? undefined : 'opacity:.45'"
                 :draggable="editLayout && !catBusy"
                 @dragstart="dragCat = c"
                 @dragend="dragCat = ''"
                 @dragover.prevent
                 @drop.prevent="dropCat(si + 1)"
-                class="min-w-0 flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 rounded-xl border transition-colors"
+                class="min-w-0 flex flex-col items-center gap-1 px-1 pt-1.5 xl:pt-2 pb-1 xl:pb-1.5 rounded-xl border transition-colors"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
             : dragCat === c ? 'opacity-40 border-gray-200'
@@ -34,10 +35,10 @@
             ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
-          <span class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-xl md:text-2xl leading-none font-bold"
+          <span class="w-8 h-8 xl:w-10 xl:h-10 rounded-lg flex items-center justify-center text-lg xl:text-2xl leading-none font-bold"
                 :class="CAT_TINTS[catTint(c) % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
           <!-- 名稱長就換第二行，不截掉 -->
-          <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
+          <span class="w-full text-xs xl:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
         </button>
         </template>
@@ -63,7 +64,7 @@
       <!-- 品項卡片 -->
       <!-- 這個分類在品項管理「收銀排列」排過格子：大螢幕固定 6 欄、照格子位置放（中間可留空）；小螢幕照順序排、不留空 -->
       <div v-else class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2 md:gap-2.5 content-start"
-           :class="layoutOn ? 'lg:grid-cols-6' : 'lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
+           :class="layoutOn ? 'lg:grid-cols-6' : 'lg:grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
         <template v-for="(prod, si) in productSlots" :key="prod ? prod.id : 'gap' + si">
         <div v-if="!prod" class="hidden lg:block" />
         <button
@@ -82,7 +83,8 @@
           </span>
           <!-- 圖片區：每張卡片都有，大小一致（4:3）。有圖放圖（資料機縮圖），沒圖或載不到就放 emoji，再沒有就放品名第一個字。
                用 padding-top 撐出 4:3，XP 的 Mypal 不支援 aspect-ratio -->
-          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
+          <!-- 1024 寬的收銀機（XP）：圖片高度減半（2:1），一排放得下 5 張；大螢幕照舊 4:3 -->
+          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100 pt-[50%] xl:pt-[75%]">
             <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
                         class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
             <div v-else class="absolute inset-0 flex items-center justify-center">
@@ -120,12 +122,13 @@
 
     <!-- 訂單區 -->
     <!-- 手機：佔滿整個寬度，內容太高時整欄捲動；平板、電腦：右側固定寬度 -->
-    <div class="w-full md:w-80 lg:w-96 md:border-l border-gray-200 bg-white flex-col shrink-0 overflow-y-auto md:overflow-hidden"
+    <div class="w-full md:w-80 lg:w-[19rem] xl:w-96 md:border-l border-gray-200 bg-white flex-col shrink-0 overflow-y-auto md:overflow-hidden"
          :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
 
       <div class="px-3 md:px-4 py-2.5 md:py-3.5 border-b border-gray-200 flex justify-between items-center shrink-0">
         <button @click="mobileView = 'products'" class="md:hidden whitespace-nowrap text-sm font-medium text-green-700 px-2 py-1.5 -ml-1 rounded-lg active:bg-green-50">◀ 選商品</button>
-        <span class="hidden md:inline font-semibold text-gray-900 whitespace-nowrap">訂單明細</span>
+        <!-- 1024 寬（右欄縮窄）時標題讓位給右邊三個按鈕 -->
+        <span class="hidden md:inline lg:hidden xl:inline font-semibold text-gray-900 whitespace-nowrap">訂單明細</span>
         <div class="flex items-center gap-1">
           <button @click="testPrint" class="whitespace-nowrap text-xs text-blue-500 hover:bg-blue-50 px-2 py-1 rounded transition-colors">🖨 測試列印</button>
           <button @click="printCartBill" :disabled="!cart.length" class="whitespace-nowrap text-xs text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🧾 帳單</button>
@@ -133,6 +136,8 @@
         </div>
       </div>
 
+      <!-- 中間（結帳人、折扣、明細）一起捲動；下面的合計、付款、結帳按鈕固定在底部，矮螢幕也不用捲就按得到 -->
+      <div class="flex-1 min-h-0 overflow-y-auto flex flex-col">
       <!-- 結帳人（換人） -->
       <CashierBar />
 
@@ -161,7 +166,7 @@
       </div>
 
       <!-- 訂單列表 -->
-      <div class="flex-1 overflow-y-auto px-3 py-2" style="min-height:7rem">
+      <div class="flex-1 px-3 py-2" style="min-height:5rem">
         <div v-if="!cart.length" class="h-full flex flex-col items-center justify-center gap-2 text-gray-300">
           <span class="text-4xl">🛒</span>
           <span class="text-sm">尚未選擇品項</span>
@@ -184,8 +189,10 @@
         </div>
       </div>
 
-      <!-- 結帳區 -->
-      <div class="border-t border-gray-200 p-4 shrink-0">
+      </div>
+
+      <!-- 結帳區（固定在底部） -->
+      <div class="border-t border-gray-200 p-3 xl:p-4 shrink-0">
         <div v-if="curDiscount && curDiscount.rate < 1" class="space-y-1 mb-2">
           <div class="flex justify-between text-xs text-gray-400">
             <span>小計</span><span>${{ subtotal }}</span>
@@ -195,9 +202,9 @@
             <span>- ${{ subtotal - total }}</span>
           </div>
         </div>
-        <div class="flex justify-between items-baseline mb-4">
+        <div class="flex justify-between items-baseline mb-2 xl:mb-4">
           <span class="text-sm text-gray-500">合計金額</span>
-          <span class="text-2xl font-bold text-gray-900">${{ total }}</span>
+          <span class="text-xl xl:text-2xl font-bold text-gray-900">${{ total }}</span>
         </div>
 
         <!-- 引導模式：付款在第 4 步 -->
@@ -208,7 +215,7 @@
                   v-for="p in payMethods" :key="p.value"
                   @click="setPay(p.value)"
                   :disabled="hasCashOnlyItem && p.value !== 'cash' && p.value !== 'voucher'"
-                  class="py-2 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 transition-colors"
+                  class="py-1.5 xl:py-2 rounded-lg border text-xs font-medium flex flex-col items-center gap-0.5 transition-colors"
                   :class="[
               curPay === p.value ? 'bg-green-50 text-green-700 border-green-500' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50',
               hasCashOnlyItem && p.value !== 'cash' && p.value !== 'voucher' ? 'opacity-40 cursor-not-allowed' : ''
@@ -242,7 +249,7 @@
         </div>
 
         <!-- 現金找零（現金，或消費券需補差額時） -->
-        <div v-if="showCashInput" class="mb-2 bg-gray-50 rounded-xl p-3 space-y-2">
+        <div v-if="showCashInput" class="mb-2 bg-gray-50 rounded-xl p-2 xl:p-3 space-y-2">
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-600 font-medium whitespace-nowrap">💵 收到現金</span>
             <input v-model.number="receivedCash" type="number" min="0"
@@ -1022,7 +1029,8 @@
     const out: (string | null)[] = []
     for (let k = 1; k <= total; k++) {
       const n = catCells.value[k]
-      out.push(n && shown.has(n) ? n : null)
+      // 編輯時這站沒有的分類也顯示（淡色），才看得出那格為什麼空著
+      out.push(n && (shown.has(n) || editLayout.value) ? n : null)
     }
     return out
   })

@@ -21,7 +21,7 @@
            @click="clickCell(n)"
            @dragover.prevent
            @drop.prevent="dropCell(n)">
-        <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl" :class="grid[n] ? 'bg-gray-100' : ''" style="padding-top:75%">
+        <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl pt-[50%] xl:pt-[75%]" :class="grid[n] ? 'bg-gray-100' : ''">
           <template v-if="grid[n]">
             <CatalogImg v-if="grid[n]!.image" :file="grid[n]!.image" :alt="grid[n]!.name" class="absolute inset-0 w-full h-full object-cover pointer-events-none" />
             <div v-else class="absolute inset-0 flex items-center justify-center">

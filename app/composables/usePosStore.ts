@@ -48,7 +48,7 @@ export interface Product {
   inactive?: boolean    // 下架：收銀台不顯示，品項管理放在「已下架」區（print-agent 1.15 起）
   locations: string[]   // 上架在哪幾個收銀站（站別 id，見 stations；後台可自訂）
   sortOrder: number
-  cell?: number         // 收銀排列的格子位置（1 起算，一排 6 格；0 / 沒有 = 沒排，接在後面；print-agent 1.24 起）
+  cell?: number         // 收銀排列的格子位置（1 起算，一排 6 格；0 / 沒有 = 沒排，接在後面；print-agent 1.25 起）
   materials: ProductMaterial[]
   image?: string        // 資料機上的圖片檔名（catalogImageUrl 轉網址）
 }

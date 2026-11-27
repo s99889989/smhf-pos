@@ -177,7 +177,7 @@ export function useCatalog() {
   const deleteProduct = (id: number) => mutate('product/delete', { id }, () => {
     store.products.value = store.products.value.filter(p => p.id !== id)
   })
-  // 收銀排列：只改格子位置，其他欄位照目前的原樣送回（print-agent 1.24 起才存得住 cell）
+  // 收銀排列：只改格子位置，其他欄位照目前的原樣送回（print-agent 1.25 起才存得住 cell）
   async function saveCells(changes: { id: number; cell: number }[], progress?: (n: number, total: number) => void) {
     let n = 0
     for (const c of changes) {
@@ -187,7 +187,7 @@ export function useCatalog() {
       const { image: _img, ...rest } = cur
       await mutate('product/save', { ...rest, cell: c.cell, locations: [...rest.locations], materials: rest.materials.map(m => ({ ...m })) }, () => { cur.cell = c.cell })
       if (connected() && (store.products.value.find(x => x.id === c.id)?.cell || 0) !== c.cell)
-        throw new Error('資料機的 print-agent 還是舊版，要更新到 1.24 才能保存收銀排列')
+        throw new Error('資料機的 print-agent 還是舊版，要更新到 1.25 才能保存收銀排列')
     }
   }
   async function setProductImage(id: number, file: File) {

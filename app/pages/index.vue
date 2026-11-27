@@ -7,7 +7,7 @@
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
       <!-- 固定格子：一排 8 格（方塊壓扁、圖示縮小，兩排放得下 16 個；小螢幕 3～4 格、不留空），分類放在自己的格子（分類的排序數字 = 格子編號），中間可以留空；
-           編輯排列時空格子顯示虛線框，可以把分類拖過去（拖到別的分類上就互換） -->
+           編輯排列時空格子顯示虛線框（拖動時才多露一排空格），可以把分類拖過去（拖到別的分類上就互換） -->
       <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 shrink-0">
       <div class="flex items-start gap-2">
         <!-- 平板、電腦不顯示左側選單欄：從這裡打開選單 -->
@@ -53,9 +53,8 @@
           {{ editLayout ? '✓ 完成' : '✏️' }}
         </button>
       </div>
-        <div v-if="editLayout" class="mt-1.5 text-xs" :class="catMsgErr ? 'text-red-600' : catMsg ? 'text-blue-600' : 'text-gray-400'">
-          {{ catMsg || '編輯排列中：分類可以拖到任何格子（空格或跟別的分類互換）；點品項不會加進訂單' }}
-        </div>
+        <!-- 只在儲存分類位置時（或失敗時）顯示一行 -->
+        <div v-if="editLayout && catMsg" class="mt-1.5 text-xs" :class="catMsgErr ? 'text-red-600' : 'text-blue-600'">{{ catMsg }}</div>
       </div>
 
       <!-- 編輯排列中：品項區換成格子編輯（跟品項管理的「收銀排列」同一個） -->
@@ -1030,7 +1029,8 @@
   const catSlots = computed<(string | null)[]>(() => {
     const shown = new Set(categories.value)
     const max = Math.max(0, ...Object.keys(catCells.value).map(Number).filter(k => shown.has(catCells.value[k]!)))
-    const total = editLayout.value ? Math.max(16, Math.ceil(Math.max(...Object.keys(catCells.value).map(Number), 0) / 8) * 8 + 8) : max
+    // 編輯時排到用到的最後一排；正在拖的時候才多露一排空格，可以往下放
+    const total = editLayout.value ? Math.ceil(Math.max(...Object.keys(catCells.value).map(Number), 1) / 8) * 8 + (dragCat.value ? 8 : 0) : max
     const out: (string | null)[] = []
     for (let k = 1; k <= total; k++) {
       const n = catCells.value[k]

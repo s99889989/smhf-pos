@@ -5,7 +5,7 @@
 
     <!-- 格子：固定 COLS 欄；卡片跟收銀台的一模一樣（圖片當底圖、品名價錢疊在下面，寬:高 = 5:4），空格子一樣大 -->
     <div class="grid gap-2 md:gap-2.5" :style="{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }">
-      <div v-for="n in rows * COLS" :key="n"
+      <div v-for="n in shownRows * COLS" :key="n"
            class="relative overflow-hidden text-left border rounded-xl transition-colors select-none"
            :class="[cellClass(n), grid[n] ? 'bg-gray-100' : '']"
            :data-drop="n"
@@ -36,6 +36,8 @@ const props = defineProps<{ category: string }>()
 const COLS = LAYOUT_COLS
 
 const { selected, msg, msgErr, grid, rows, place: placeRaw, clickCell } = useLayoutEdit(() => props.category)
+// 排到用到的最後一排；拖動或選起品項時才多露一排空格，可以往下放
+const shownRows = computed(() => Math.max(1, rows.value - 1) + (dragId.value || selected.value ? 1 : 0))
 
 // 拖到第 n 格放開：放過去（有品項就互換）
 const drag = usePointerDrag<number>((id, target) => placeRaw(id, Number(target)))

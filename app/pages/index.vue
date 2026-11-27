@@ -12,8 +12,16 @@
                 v-for="(c, ci) in categories" :key="c"
                 @click="pickCat(c)"
                 :title="c"
+                :draggable="editLayout && !catBusy"
+                @dragstart="dragCat = c"
+                @dragend="dragCat = ''"
+                @dragover.prevent
+                @drop.prevent="dropCat(c)"
                 class="shrink-0 min-w-[4.5rem] md:min-w-24 max-w-[8.5rem] md:max-w-[11rem] flex flex-col items-center gap-1 px-2 pt-2 pb-1.5 rounded-xl border transition-colors"
-                :class="activeCat === c
+                :class="dragCat && dragCat !== c
+            ? 'border-dashed border-green-400 bg-green-50/30'
+            : dragCat === c ? 'opacity-40 border-gray-200'
+            : activeCat === c
             ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
@@ -22,14 +30,10 @@
           <!-- 名稱長：按鈕跟著加寬（有上限），再長就換第二行，不截掉 -->
           <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
-          <!-- 編輯排列：分類左右移 -->
-          <span v-if="editLayout" class="flex gap-1 mt-0.5">
-            <span role="button" @click.stop="moveCat(c, -1)" class="px-1.5 rounded border border-gray-300 text-xs text-gray-600 hover:bg-gray-100" :class="ci === 0 || catBusy ? 'opacity-30 pointer-events-none' : ''">‹ 左</span>
-            <span role="button" @click.stop="moveCat(c, 1)" class="px-1.5 rounded border border-gray-300 text-xs text-gray-600 hover:bg-gray-100" :class="ci === categories.length - 1 || catBusy ? 'opacity-30 pointer-events-none' : ''">右 ›</span>
-          </span>
         </button>
         <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
         <div class="ml-auto self-center flex items-center gap-2">
+          <span v-if="editLayout && !catMsg" class="text-xs text-gray-400">分類可以直接拖動換位置</span>
           <span v-if="catMsg" class="text-xs" :class="catMsgErr ? 'text-red-600' : 'text-blue-600'">{{ catMsg }}</span>
           <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
                   class="text-xs px-3 py-1.5 rounded-lg border whitespace-nowrap"
@@ -981,16 +985,23 @@
   const catBusy = ref(false)
   const catMsg = ref('')
   const catMsgErr = ref(false)
-  // 分類往左 / 右移一格（跳過這站沒有的分類），整份分類重新編號 1、2、3…，只存有變的
-  async function moveCat(c: string, dir: -1 | 1) {
+  // 分類拖到另一個分類上：放到那個位置（往後拖放在它後面，往前拖放在它前面）。
+  // 整份分類重新編號 1、2、3…（這站沒有的分類位置不動），只存有變的
+  const dragCat = ref('')
+  function dropCat(target: string) {
+    const c = dragCat.value
+    dragCat.value = ''
+    if (c && c !== target) moveCatTo(c, target)
+  }
+  async function moveCatTo(c: string, target: string) {
     const shown = categories.value
-    const target = shown[shown.indexOf(c) + dir]
-    if (!target || catBusy.value) return
+    if (catBusy.value || !shown.includes(c) || !shown.includes(target)) return
+    const after = shown.indexOf(target) > shown.indexOf(c)
     pickCat(activeCat.value) // 移完畫面停在原本選的分類
     const full = categoryList.value.map(x => x.name)
     for (const n of shown) if (!full.includes(n)) full.push(n)
     full.splice(full.indexOf(c), 1)
-    full.splice(full.indexOf(target) + (dir > 0 ? 1 : 0), 0, c)
+    full.splice(full.indexOf(target) + (after ? 1 : 0), 0, c)
     const changes = full.map((name, i) => ({ name, sortOrder: i + 1, cur: categoryList.value.find(x => x.name === name) }))
       .filter(x => !x.cur || x.cur.sortOrder !== x.sortOrder || !x.cur.id)
     catBusy.value = true

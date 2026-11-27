@@ -16,20 +16,29 @@ export function useLayoutEdit(category: () => string) {
 
   const bySort = (a: Product, b: Product) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.id - b.id
   const list = computed(() => products.value.filter(p => !p.inactive && (p.category || '') === category()).sort(bySort))
-  const cellOf = (id: number) => products.value.find(p => p.id === id)?.cell || 0
 
-  // 格子編號 → 品項；同一格有兩個（不該發生）的話，後面那個算「還沒排」
-  const grid = computed(() => {
+  // 格子編號 → 品項。沒排過的品項不另外列：照原本順序接在排好的最後面（跟收銀台顯示的一樣），
+  // 一動到這個分類就把它們的位置一起存起來，之後都是實際位置。同一格有兩個（不該發生）的話，後面那個也當沒排
+  const real = computed(() => {
     const g: Record<number, Product> = {}
     for (const p of list.value) if ((p.cell || 0) > 0 && !g[p.cell!]) g[p.cell!] = p
     return g
   })
-  const unplaced = computed(() => list.value.filter(p => !((p.cell || 0) > 0) || grid.value[p.cell!] !== p))
-  const placedCount = computed(() => Object.keys(grid.value).length)
+  const unplaced = computed(() => list.value.filter(p => !((p.cell || 0) > 0) || real.value[p.cell!] !== p))
+  const placedCount = computed(() => Object.keys(real.value).length)
+  const grid = computed(() => {
+    const g: Record<number, Product> = { ...real.value }
+    let n = Math.max(0, ...Object.keys(real.value).map(Number))
+    for (const p of unplaced.value) g[++n] = p
+    return g
+  })
   const maxCell = computed(() => Math.max(0, ...Object.keys(grid.value).map(Number)))
   // 多留一排空的，可以往下放
-  const rows = computed(() => Math.max(2, Math.ceil(Math.max(maxCell.value, list.value.length) / LAYOUT_COLS) + 1))
+  const rows = computed(() => Math.max(2, Math.ceil(maxCell.value / LAYOUT_COLS) + 1))
   const selectedName = computed(() => list.value.find(p => p.id === selected.value)?.name || '')
+  const cellIn = (id: number) => Number(Object.keys(grid.value).find(k => grid.value[Number(k)]!.id === id) || 0)
+  // 還沒存過的位置（沒排過的品項）一起存
+  const pending = () => unplaced.value.map(p => ({ id: p.id, cell: cellIn(p.id) }))
 
   async function save(changes: { id: number; cell: number }[], done: string) {
     if (!changes.length || busy.value) return
@@ -47,15 +56,16 @@ export function useLayoutEdit(category: () => string) {
     }
   }
 
-  // 把品項放到第 n 格（0 = 移出格子）；那格原本有品項就換到這個品項原本的位置
+  // 把品項放到第 n 格；那格原本有品項就換到這個品項原本的位置
   function place(id: number, n: number) {
-    const from = grid.value[cellOf(id)]?.id === id ? cellOf(id) : 0
+    const from = cellIn(id)
     selected.value = null
-    if (from === n) return
-    const other = n ? grid.value[n] : undefined
-    const changes = [{ id, cell: n }]
-    if (other && other.id !== id) changes.push({ id: other.id, cell: from })
-    save(changes, '已儲存')
+    if (!n || from === n) return
+    const other = grid.value[n]
+    const map = new Map(pending().map(c => [c.id, c.cell]))
+    map.set(id, n)
+    if (other && other.id !== id) map.set(other.id, from)
+    save([...map].map(([id, cell]) => ({ id, cell })), '已儲存')
   }
 
   // 點格子：已選品項 → 放過去（有東西就互換）；沒選 → 選起來 / 取消
@@ -64,13 +74,10 @@ export function useLayoutEdit(category: () => string) {
     if (selected.value && (!p || p.id !== selected.value)) { place(selected.value, n); return }
     selected.value = p ? (selected.value === p.id ? null : p.id) : null
   }
-  function clickUnplaced(id: number) {
-    selected.value = selected.value === id ? null : id
-  }
 
-  // 排好的照格子順序、沒排的照原本順序，依序填 1、2、3…（去掉中間的空格）
+  // 照目前格子順序依序填 1、2、3…（去掉中間的空格）
   function compact() {
-    const ordered = [...Object.keys(grid.value).map(Number).sort((a, b) => a - b).map(k => grid.value[k]!), ...unplaced.value]
+    const ordered = Object.keys(grid.value).map(Number).sort((a, b) => a - b).map(k => grid.value[k]!)
     save(ordered.map((p, i) => ({ id: p.id, cell: i + 1 })), '已排滿')
   }
   function clearAll() {
@@ -78,5 +85,5 @@ export function useLayoutEdit(category: () => string) {
     save(list.value.filter(p => (p.cell || 0) > 0).map(p => ({ id: p.id, cell: 0 })), '已清掉')
   }
 
-  return { selected, busy, msg, msgErr, list, grid, unplaced, placedCount, rows, selectedName, cellOf, place, clickCell, clickUnplaced, compact, clearAll }
+  return { selected, busy, msg, msgErr, list, grid, placedCount, rows, selectedName, place, clickCell, compact, clearAll }
 }

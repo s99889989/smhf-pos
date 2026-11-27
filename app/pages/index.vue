@@ -14,8 +14,9 @@
         <NavMenuButton class="mt-1" />
       <div class="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 xl:gap-2">
         <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
+        <!-- 分類按鈕、空格都是正方形（padding-top:100% 撐高，XP 的 Mypal 不支援 aspect-ratio），名稱換行也不會變形 -->
         <div v-if="!c"
-             class="min-h-[3.25rem] rounded-xl"
+             class="rounded-xl" style="padding-top:100%"
              :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden lg:block'"
              :data-drop="editLayout ? si + 1 : null" />
         <button
@@ -25,7 +26,7 @@
                 :style="(categories.includes(c) ? '' : 'opacity:.45;') + (editLayout ? 'touch-action:none' : '')"
                 :data-drop="editLayout ? si + 1 : null"
                 @pointerdown="editLayout && !catBusy && catDrag.down($event, c, c)"
-                class="min-w-0 min-h-[3.25rem] flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-xl border transition-colors select-none"
+                class="relative block min-w-0 rounded-xl border transition-colors select-none"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
             : dragCat === c ? 'opacity-40 border-gray-200'
@@ -33,11 +34,14 @@
             ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
-          <span class="shrink-0 w-6 h-6 xl:w-7 xl:h-7 rounded-md flex items-center justify-center text-sm xl:text-base leading-none font-bold"
-                :class="CAT_TINTS[catTint(c) % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
-          <!-- 名稱長就換第二行，不截掉 -->
-          <span class="w-full text-xs xl:text-sm text-center line-clamp-2 leading-tight break-words"
-                :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
+          <span class="block" style="padding-top:100%"></span>
+          <span class="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1">
+            <span class="shrink-0 w-7 h-7 xl:w-9 xl:h-9 rounded-md flex items-center justify-center text-base xl:text-xl leading-none font-bold"
+                  :class="CAT_TINTS[catTint(c) % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
+            <!-- 名稱長就換第二行，不截掉 -->
+            <span class="w-full text-xs xl:text-sm text-center line-clamp-2 leading-tight break-words"
+                  :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
+          </span>
         </button>
         </template>
       </div>

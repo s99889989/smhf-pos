@@ -22,12 +22,31 @@
           <!-- 名稱長：按鈕跟著加寬（有上限），再長就換第二行，不截掉 -->
           <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
+          <!-- 編輯排列：分類左右移 -->
+          <span v-if="editLayout" class="flex gap-1 mt-0.5">
+            <span role="button" @click.stop="moveCat(c, -1)" class="px-1.5 rounded border border-gray-300 text-xs text-gray-600 hover:bg-gray-100" :class="ci === 0 || catBusy ? 'opacity-30 pointer-events-none' : ''">‹ 左</span>
+            <span role="button" @click.stop="moveCat(c, 1)" class="px-1.5 rounded border border-gray-300 text-xs text-gray-600 hover:bg-gray-100" :class="ci === categories.length - 1 || catBusy ? 'opacity-30 pointer-events-none' : ''">右 ›</span>
+          </span>
         </button>
+        <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
+        <div class="ml-auto self-center flex items-center gap-2">
+          <span v-if="catMsg" class="text-xs" :class="catMsgErr ? 'text-red-600' : 'text-blue-600'">{{ catMsg }}</span>
+          <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
+                  class="text-xs px-3 py-1.5 rounded-lg border whitespace-nowrap"
+                  :class="editLayout ? 'bg-green-700 border-green-700 text-white font-semibold' : 'border-gray-300 text-gray-500 hover:bg-gray-50'">
+            {{ editLayout ? '✓ 完成排列' : '✏️ 編輯排列' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 編輯排列中：品項區換成格子編輯（跟品項管理的「收銀排列」同一個） -->
+      <div v-if="editLayout" class="flex-1 overflow-y-auto p-3 md:p-4">
+        <PosLayoutEditor v-if="activeCat" :key="activeCat" :category="activeCat" />
       </div>
 
       <!-- 品項卡片 -->
       <!-- 這個分類在品項管理「收銀排列」排過格子：大螢幕固定 6 欄、照格子位置放（中間可留空）；小螢幕照順序排、不留空 -->
-      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2 md:gap-2.5 content-start"
+      <div v-else class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2 md:gap-2.5 content-start"
            :class="layoutOn ? 'lg:grid-cols-6' : 'lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
         <template v-for="(prod, si) in productSlots" :key="prod ? prod.id : 'gap' + si">
         <div v-if="!prod" class="hidden lg:block" />
@@ -955,6 +974,42 @@
     const ordered = categoryList.value.map(c => c.name).filter(n => used.has(n))
     return [...ordered, ...[...used].filter(n => !ordered.includes(n))]
   })
+  // ---- 編輯排列（收銀頁直接調分類順序、品項格子）----
+  const catalog = useCatalog()
+  const catState = catalog.state
+  const editLayout = ref(false)
+  const catBusy = ref(false)
+  const catMsg = ref('')
+  const catMsgErr = ref(false)
+  // 分類往左 / 右移一格（跳過這站沒有的分類），整份分類重新編號 1、2、3…，只存有變的
+  async function moveCat(c: string, dir: -1 | 1) {
+    const shown = categories.value
+    const target = shown[shown.indexOf(c) + dir]
+    if (!target || catBusy.value) return
+    pickCat(activeCat.value) // 移完畫面停在原本選的分類
+    const full = categoryList.value.map(x => x.name)
+    for (const n of shown) if (!full.includes(n)) full.push(n)
+    full.splice(full.indexOf(c), 1)
+    full.splice(full.indexOf(target) + (dir > 0 ? 1 : 0), 0, c)
+    const changes = full.map((name, i) => ({ name, sortOrder: i + 1, cur: categoryList.value.find(x => x.name === name) }))
+      .filter(x => !x.cur || x.cur.sortOrder !== x.sortOrder || !x.cur.id)
+    catBusy.value = true
+    catMsgErr.value = false
+    try {
+      let n = 0
+      for (const x of changes) {
+        catMsg.value = `儲存分類順序 ${++n}/${changes.length}…`
+        try { await catalog.saveCategory({ id: x.cur?.id || undefined, name: x.name, sortOrder: x.sortOrder }) }
+        catch (e) { if (!/已經有分類|要更新到 1\.1[456]/.test((e as Error).message)) throw e }
+      }
+      catMsg.value = ''
+    } catch (e) {
+      catMsg.value = '分類順序儲存失敗：' + (e as Error).message
+      catMsgErr.value = true
+    } finally {
+      catBusy.value = false
+    }
+  }
   const activeCat = computed(() => (categories.value.includes(curCat.value) ? curCat.value : categories.value[0] || ''))
   const filteredProducts = computed(() =>
           locProducts.value.filter(p => (p.category || '其他') === activeCat.value)

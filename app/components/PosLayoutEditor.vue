@@ -18,19 +18,30 @@
 
     <!-- 格子：固定 COLS 欄 -->
     <div class="grid gap-1.5" :style="{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }">
+      <!-- 跟收銀台一樣的卡片：上面 4:3 圖片（沒圖放 emoji / 第一個字），下面品名、價錢 -->
       <div v-for="n in rows * COLS" :key="n"
-           class="relative h-20 rounded-lg border transition-colors"
+           class="relative rounded-xl border transition-colors overflow-hidden min-h-[8rem]"
            :class="cellClass(n)"
            @click="clickCell(n)"
            @dragover.prevent
            @drop.prevent="dropCell(n)">
-        <span class="absolute top-0.5 left-1 text-[10px] text-gray-300 pointer-events-none">{{ n }}</span>
+        <span class="absolute top-1 left-1.5 z-10 text-[10px] text-gray-400 pointer-events-none">{{ n }}</span>
         <div v-if="grid[n]"
              draggable="true"
              @dragstart="dragId = grid[n]!.id"
-             class="absolute inset-0 flex flex-col items-center justify-center px-1 text-center cursor-pointer select-none">
-          <span class="text-xl leading-none">{{ grid[n]!.emoji || grid[n]!.name.slice(0, 1) }}</span>
-          <span class="mt-1 text-xs leading-tight line-clamp-2 text-gray-800">{{ grid[n]!.name }}</span>
+             class="flex flex-col cursor-pointer select-none">
+          <div class="relative bg-gray-100" style="padding-top:75%">
+            <CatalogImg v-if="grid[n]!.image" :file="grid[n]!.image" :alt="grid[n]!.name" class="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+            <div v-else class="absolute inset-0 flex items-center justify-center">
+              <span v-if="grid[n]!.emoji" class="text-4xl leading-none">{{ grid[n]!.emoji }}</span>
+              <span v-else class="text-3xl font-bold text-gray-300 leading-none">{{ grid[n]!.name.slice(0, 1) }}</span>
+            </div>
+          </div>
+          <div class="p-2">
+            <div class="text-sm font-medium text-gray-900 leading-snug">{{ grid[n]!.name }}</div>
+            <div v-if="grid[n]!.openPrice" class="text-sm font-bold text-orange-600">✏️ 時價</div>
+            <div v-else class="text-sm font-bold text-green-700">${{ grid[n]!.price }}</div>
+          </div>
         </div>
       </div>
     </div>

@@ -38,7 +38,7 @@
                 @contextmenu.prevent="removeOne(prod)"
                 @wheel="wheelCard($event, prod)"
                 class="relative flex flex-col justify-start text-left bg-white border rounded-xl p-2.5 md:p-3 active:scale-95 transition-all"
-                :class="[layoutOn ? 'lg:p-1.5 min-h-[4.5rem]' : '', prod.cashOnly && curPay !== 'cash'
+                :class="[prod.cashOnly && curPay !== 'cash'
             ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400'
             : 'border-gray-200 hover:border-green-500 hover:bg-green-50']"
         >
@@ -47,8 +47,7 @@
           </span>
           <!-- 圖片區：每張卡片都有，大小一致（4:3）。有圖放圖（資料機縮圖），沒圖或載不到就放 emoji，再沒有就放品名第一個字。
                用 padding-top 撐出 4:3，XP 的 Mypal 不支援 aspect-ratio -->
-          <!-- 收銀排列（6 欄）的分類格子比較窄：不放圖，只放品名和價錢，跟舊 POS 的按鈕一樣 -->
-          <div v-if="!layoutOn" class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
+          <div class="-mx-2.5 -mt-2.5 md:-mx-3 md:-mt-3 mb-2 relative overflow-hidden rounded-t-xl bg-gray-100" style="padding-top:75%">
             <CatalogImg v-if="prod.image && !imgErrors.has(prod.image)" :file="prod.image" :alt="prod.name"
                         class="absolute inset-0 w-full h-full object-cover" @error="imgErrors.add(prod.image!)" />
             <div v-else class="absolute inset-0 flex items-center justify-center">
@@ -56,14 +55,14 @@
               <span v-else class="text-4xl font-bold text-gray-300 leading-none">{{ prod.name.slice(0, 1) }}</span>
             </div>
           </div>
-          <div class="font-medium text-gray-900 leading-snug" :class="layoutOn ? 'text-sm lg:text-xs mb-1 break-words' : 'text-sm mb-1.5'">{{ prod.name }}</div>
-          <div v-if="prod.openPrice" class="font-bold text-orange-600" :class="layoutOn ? 'text-sm lg:text-xs' : 'text-base'">✏️ 時價</div>
+          <div class="text-sm font-medium text-gray-900 leading-snug mb-1.5">{{ prod.name }}</div>
+          <div v-if="prod.openPrice" class="text-base font-bold text-orange-600">✏️ 時價</div>
           <div v-else class="flex flex-wrap items-baseline gap-x-1.5">
-            <div class="font-bold text-green-700" :class="layoutOn ? 'text-sm' : 'text-base'">${{ discountedPrice(prod.price) }}</div>
+            <div class="text-base font-bold text-green-700">${{ discountedPrice(prod.price) }}</div>
             <div v-if="curDiscount && curDiscount.rate < 1" class="text-xs text-gray-400 line-through">${{ prod.price }}</div>
           </div>
-          <div v-if="prod.note && !layoutOn" class="text-xs text-gray-400 mt-0.5">{{ prod.note }}</div>
-          <div v-if="prod.cashOnly" class="text-xs text-amber-600 mt-1 font-medium">💵<template v-if="!layoutOn"> 限現金</template></div>
+          <div v-if="prod.note" class="text-xs text-gray-400 mt-0.5">{{ prod.note }}</div>
+          <div v-if="prod.cashOnly" class="text-xs text-amber-600 mt-1 font-medium">💵 限現金</div>
         </button>
         </template>
         <div v-if="!filteredProducts.length" class="col-span-full flex items-center justify-center py-20 text-gray-400 text-sm">

@@ -5,7 +5,7 @@
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div>
-          <h1 class="text-lg font-bold text-gray-900">品項管理</h1>
+          <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2"><NavMenuButton />品項管理</h1>
           <p class="text-xs text-gray-400 mt-0.5">管理收銀品項、定價與物料消耗</p>
         </div>
         <!-- 篩選：搜尋、分類（站別改在分類管理設定） -->

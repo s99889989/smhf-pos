@@ -2,7 +2,7 @@
   <div class="flex flex-col h-full overflow-hidden">
 
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 shrink-0">
-      <h1 class="text-lg font-bold text-gray-900">系統設定</h1>
+      <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2"><NavMenuButton />系統設定</h1>
       <p class="text-xs text-gray-400 mt-0.5">折扣類型與其他設定</p>
     </div>
 

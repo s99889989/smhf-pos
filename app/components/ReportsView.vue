@@ -4,7 +4,7 @@
     <!-- 頁頭 -->
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
-        <h1 class="text-lg font-bold text-gray-900">{{ TITLES[props.section].title }}</h1>
+        <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2"><NavMenuButton />{{ TITLES[props.section].title }}</h1>
         <p class="text-xs text-gray-400 mt-0.5">{{ TITLES[props.section].sub }}</p>
       </div>
       <!-- 每日 / 月 切換 -->

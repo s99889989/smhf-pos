@@ -2,7 +2,7 @@
   <div class="flex flex-col h-full overflow-hidden">
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div>
-        <h1 class="text-lg font-bold text-gray-900">員工管理</h1>
+        <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2"><NavMenuButton />員工管理</h1>
         <p class="text-xs text-gray-400 mt-0.5">結帳員工折扣時會要求選擇員工；共 {{ employees.length }} 人，在職 {{ activeCount }} 人</p>
       </div>
       <div class="flex flex-wrap gap-2">

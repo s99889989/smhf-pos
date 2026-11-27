@@ -3,7 +3,7 @@
 
     <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
       <div class="min-w-0">
-        <h1 class="text-lg font-bold text-gray-900">連線狀況</h1>
+        <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2"><NavMenuButton />連線狀況</h1>
         <p class="text-xs text-gray-400 mt-0.5">哪幾台正在用收銀系統、這台連不連得到資料機。每分鐘自動更新。</p>
       </div>
       <div class="flex items-center gap-3 shrink-0">

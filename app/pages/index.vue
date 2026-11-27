@@ -10,15 +10,8 @@
            編輯排列時空格子顯示虛線框，可以把分類拖過去（拖到別的分類上就互換） -->
       <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 shrink-0">
       <div class="flex items-start gap-2">
-        <!-- 收銀頁不顯示左側選單欄：平板、電腦從這裡打開選單（手機上面已經有標題列的 ☰） -->
-        <button @click="navDrawerOpen = true" title="選單" aria-label="開啟選單"
-                class="hidden md:flex shrink-0 w-8 h-8 mt-1 rounded-lg border border-gray-300 items-center justify-center text-gray-500 hover:bg-gray-50">
-          <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-            <line x1="2" y1="4" x2="12" y2="4"/>
-            <line x1="2" y1="7" x2="12" y2="7"/>
-            <line x1="2" y1="10" x2="12" y2="10"/>
-          </svg>
-        </button>
+        <!-- 平板、電腦不顯示左側選單欄：從這裡打開選單 -->
+        <NavMenuButton class="mt-1" />
       <div class="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 xl:gap-2">
         <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
         <div v-if="!c"
@@ -1010,7 +1003,6 @@
     return [...ordered, ...[...used].filter(n => !ordered.includes(n))]
   })
   // ---- 編輯排列（收銀頁直接調分類順序、品項格子）----
-  const navDrawerOpen = useState('navDrawerOpen', () => false) // layouts/default.vue 的抽屜選單
   const catalog = useCatalog()
   const catState = catalog.state
   const editLayout = ref(false)

@@ -75,7 +75,7 @@
             <span class="absolute top-1.5 right-1.5 bg-black/50 text-white text-xs rounded-md px-1.5 py-0.5">#{{ prod.sortOrder }}</span>
           </div>
           <div class="p-2.5 flex-1 flex flex-col">
-            <div class="font-medium text-gray-900 text-sm leading-snug">{{ prod.name }}</div>
+            <div class="font-medium text-gray-900 text-sm leading-snug">{{ prod.name }} <span class="text-xs font-normal text-gray-400 whitespace-nowrap">ID {{ prod.id }}</span></div>
             <div v-if="prod.note" class="text-xs text-gray-400">{{ prod.note }}</div>
             <div class="font-semibold text-sm mt-0.5">
               <template v-if="prod.openPrice">
@@ -253,7 +253,7 @@
     <!-- 新增/編輯 Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showModal = false">
       <div class="bg-white rounded-2xl p-5 sm:p-7 w-[480px] lg:w-[900px] max-w-[95vw] max-h-[90vh] overflow-y-auto shadow-2xl">
-        <h3 class="text-base font-bold text-gray-900 mb-5">{{ editId ? '編輯品項' : '新增品項' }}</h3>
+        <h3 class="text-base font-bold text-gray-900 mb-5">{{ editId ? '編輯品項' : '新增品項' }}<span v-if="editId" class="ml-2 text-sm font-normal text-gray-400">ID {{ editId }}</span></h3>
 
         <p v-if="formError" class="text-xs text-red-600 mb-3">{{ formError }}</p>
         <!-- 夠寬（lg 以上）時分左右兩欄：左邊基本資料與售價設定，右邊圖片、站別、物料；窄螢幕和手機維持單欄 -->
@@ -507,7 +507,8 @@ const filteredAll = computed(() => {
       const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
       if (!words.length) return true
       const text = `${p.name} ${p.note || ''} ${p.category || ''}`.toLowerCase()
-      return words.every(w => text.includes(w))
+      // 輸入數字也能找 ID（同名品項用 ID 分）
+      return words.every(w => text.includes(w) || w === String(p.id) || w === `id${p.id}`)
     })
   // 排序存檔中：照拖好的順序顯示，不要跟著一筆一筆存回來的資料跳動
   const o = orderOverride.value

@@ -6,19 +6,26 @@
 
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
-      <!-- 固定格子：一排最多 6 個（手機 4 個），排不下往下一排，依內容自然長高（不出捲軸） -->
+      <!-- 固定格子：一排 6 格（手機 4 格），分類放在自己的格子（分類的排序數字 = 格子編號），中間可以留空；
+           編輯排列時空格子顯示虛線框，可以把分類拖過去（拖到別的分類上就互換） -->
       <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 shrink-0">
       <div class="flex items-start gap-2">
       <div class="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-6 gap-2">
+        <template v-for="(c, si) in catSlots" :key="c || 'gap' + si">
+        <div v-if="!c"
+             class="min-h-[4.5rem] rounded-xl"
+             :class="editLayout ? 'border border-dashed transition-colors ' + (dragCat ? 'border-green-400 bg-green-50/30' : 'border-gray-200') : 'hidden sm:block'"
+             @dragover.prevent
+             @drop.prevent="dropCat(si + 1)" />
         <button
-                v-for="(c, ci) in categories" :key="c"
+                v-else
                 @click="pickCat(c)"
                 :title="c"
                 :draggable="editLayout && !catBusy"
                 @dragstart="dragCat = c"
                 @dragend="dragCat = ''"
                 @dragover.prevent
-                @drop.prevent="dropCat(c)"
+                @drop.prevent="dropCat(si + 1)"
                 class="min-w-0 flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 rounded-xl border transition-colors"
                 :class="dragCat && dragCat !== c
             ? 'border-dashed border-green-400 bg-green-50/30'
@@ -28,11 +35,12 @@
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
           <span class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-xl md:text-2xl leading-none font-bold"
-                :class="CAT_TINTS[ci % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
+                :class="CAT_TINTS[catTint(c) % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
           <!-- 名稱長就換第二行，不截掉 -->
           <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
         </button>
+        </template>
       </div>
         <!-- 編輯排列：直接在收銀台上調分類順序和品項格子；編輯中點品項不會加進訂單 -->
         <button v-if="catState.mode !== 'loading'" @click="editLayout = !editLayout"
@@ -43,7 +51,7 @@
         </button>
       </div>
         <div v-if="editLayout" class="mt-1.5 text-xs" :class="catMsgErr ? 'text-red-600' : catMsg ? 'text-blue-600' : 'text-gray-400'">
-          {{ catMsg || '編輯排列中：分類可以直接拖動換位置；點品項不會加進訂單' }}
+          {{ catMsg || '編輯排列中：分類可以拖到任何格子（空格或跟別的分類互換）；點品項不會加進訂單' }}
         </div>
       </div>
 
@@ -989,37 +997,67 @@
   const catBusy = ref(false)
   const catMsg = ref('')
   const catMsgErr = ref(false)
-  // 分類拖到另一個分類上：放到那個位置（往後拖放在它後面，往前拖放在它前面）。
-  // 整份分類重新編號 1、2、3…（這站沒有的分類位置不動），只存有變的
+  // ---- 分類格子 ----
+  // 分類的排序數字（sortOrder）就是格子編號（1 起算、一排 6 格），中間沒用到的數字就是空格。
+  // 數字不合法或重複的分類，接在最後面（第一次拖動時一起存成實際位置）。格子算全部分類，這站沒有的分類那格在這站是空的
+  const catCells = computed(() => {
+    const all = categoryList.value.map(c => ({ name: c.name, so: Number(c.sortOrder) || 0 }))
+    for (const n of categories.value) if (!all.some(a => a.name === n)) all.push({ name: n, so: 0 })
+    const g: Record<number, string> = {}
+    const rest: string[] = []
+    for (const a of all) {
+      if (a.so >= 1 && Number.isInteger(a.so) && !g[a.so]) g[a.so] = a.name
+      else rest.push(a.name)
+    }
+    let m = Math.max(0, ...Object.keys(g).map(Number))
+    for (const n of rest) g[++m] = n
+    return g
+  })
+  const catCellOf = (name: string) => Number(Object.keys(catCells.value).find(k => catCells.value[Number(k)] === name) || 0)
+  // 畫面上的格子：這站有的分類放在自己的格子，其他是空格；編輯時多留到至少 3 排、再多一排空的可以放
+  const catSlots = computed<(string | null)[]>(() => {
+    const shown = new Set(categories.value)
+    const max = Math.max(0, ...Object.keys(catCells.value).map(Number).filter(k => shown.has(catCells.value[k]!)))
+    const total = editLayout.value ? Math.max(18, Math.ceil(Math.max(...Object.keys(catCells.value).map(Number), 0) / 6) * 6 + 6) : max
+    const out: (string | null)[] = []
+    for (let k = 1; k <= total; k++) {
+      const n = catCells.value[k]
+      out.push(n && shown.has(n) ? n : null)
+    }
+    return out
+  })
+  const catTint = (name: string) => Math.max(0, categories.value.indexOf(name))
+
   const dragCat = ref('')
-  function dropCat(target: string) {
+  function dropCat(n: number) {
     const c = dragCat.value
     dragCat.value = ''
-    if (c && c !== target) moveCatTo(c, target)
+    if (c) placeCat(c, n)
   }
-  async function moveCatTo(c: string, target: string) {
-    const shown = categories.value
-    if (catBusy.value || !shown.includes(c) || !shown.includes(target)) return
-    const after = shown.indexOf(target) > shown.indexOf(c)
+  // 把分類放到第 n 格；那格原本有分類就換到這個分類原本的格子。只存位置有變、或還沒存過的分類
+  async function placeCat(c: string, n: number) {
+    const from = catCellOf(c)
+    if (catBusy.value || !from || from === n) return
     pickCat(activeCat.value) // 移完畫面停在原本選的分類
-    const full = categoryList.value.map(x => x.name)
-    for (const n of shown) if (!full.includes(n)) full.push(n)
-    full.splice(full.indexOf(c), 1)
-    full.splice(full.indexOf(target) + (after ? 1 : 0), 0, c)
-    const changes = full.map((name, i) => ({ name, sortOrder: i + 1, cur: categoryList.value.find(x => x.name === name) }))
-      .filter(x => !x.cur || x.cur.sortOrder !== x.sortOrder || !x.cur.id)
+    const want = new Map<string, number>()
+    for (const [k, name] of Object.entries(catCells.value)) want.set(name, Number(k))
+    const other = catCells.value[n]
+    want.set(c, n)
+    if (other && other !== c) want.set(other, from)
+    const changes = [...want].map(([name, cell]) => ({ name, cell, cur: categoryList.value.find(x => x.name === name) }))
+      .filter(x => !x.cur || !x.cur.id || x.cur.sortOrder !== x.cell)
     catBusy.value = true
     catMsgErr.value = false
     try {
-      let n = 0
+      let i = 0
       for (const x of changes) {
-        catMsg.value = `儲存分類順序 ${++n}/${changes.length}…`
-        try { await catalog.saveCategory({ id: x.cur?.id || undefined, name: x.name, sortOrder: x.sortOrder }) }
+        catMsg.value = `儲存分類位置 ${++i}/${changes.length}…`
+        try { await catalog.saveCategory({ id: x.cur?.id || undefined, name: x.name, sortOrder: x.cell }) }
         catch (e) { if (!/已經有分類|要更新到 1\.1[456]/.test((e as Error).message)) throw e }
       }
       catMsg.value = ''
     } catch (e) {
-      catMsg.value = '分類順序儲存失敗：' + (e as Error).message
+      catMsg.value = '分類位置儲存失敗：' + (e as Error).message
       catMsgErr.value = true
     } finally {
       catBusy.value = false

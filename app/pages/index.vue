@@ -7,18 +7,20 @@
       <!-- 分類 -->
       <!-- 分類：圓角方塊，上面淡色底圖示（分類 emoji，沒設就放第一個字），下面名稱；選中的綠框綠底 -->
       <!-- 排不下就換行，最多露出兩排，再多就在這區上下捲 -->
-      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex flex-wrap gap-2 overflow-y-auto max-h-[10.75rem] md:max-h-[11.75rem] shrink-0">
+      <div class="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex flex-wrap gap-2 overflow-y-auto max-h-[12rem] md:max-h-[13rem] shrink-0">
         <button
                 v-for="(c, ci) in categories" :key="c"
                 @click="pickCat(c)"
-                class="shrink-0 w-[4.5rem] md:w-24 flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 rounded-xl border transition-colors"
+                :title="c"
+                class="shrink-0 min-w-[4.5rem] md:min-w-24 max-w-[8.5rem] md:max-w-[11rem] flex flex-col items-center gap-1 px-2 pt-2 pb-1.5 rounded-xl border transition-colors"
                 :class="activeCat === c
             ? 'bg-green-50 border-green-600 ring-1 ring-green-600'
             : 'bg-white border-gray-200 hover:bg-gray-50'"
         >
           <span class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-xl md:text-2xl leading-none font-bold"
                 :class="CAT_TINTS[ci % CAT_TINTS.length]">{{ catEmoji(c) || c.slice(0, 1) }}</span>
-          <span class="w-full text-xs md:text-sm text-center truncate leading-tight"
+          <!-- 名稱長：按鈕跟著加寬（有上限），再長就換第二行，不截掉 -->
+          <span class="w-full text-xs md:text-sm text-center line-clamp-2 leading-tight break-words"
                 :class="activeCat === c ? 'text-green-800 font-semibold' : 'text-gray-700'">{{ c }}</span>
         </button>
       </div>

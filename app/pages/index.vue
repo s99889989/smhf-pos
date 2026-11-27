@@ -63,8 +63,9 @@
 
       <!-- 品項卡片 -->
       <!-- 這個分類在品項管理「收銀排列」排過格子：大螢幕固定 6 欄、照格子位置放（中間可留空）；小螢幕照順序排、不留空 -->
-      <div v-else class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2 md:gap-2.5 content-start"
-           :class="layoutOn ? 'lg:grid-cols-6' : 'lg:grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
+      <!-- 1024～1279 寬（XP 收銀機）：不管有沒有排過格子都固定一排 6 張（欄數寫死在 class，不靠切換）；1280 以上沒排過的才自動排滿 -->
+      <div v-else class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-6 gap-2 md:gap-2.5 content-start"
+           :class="layoutOn ? 'xl:grid-cols-6' : 'xl:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]'">
         <template v-for="(prod, si) in productSlots" :key="prod ? prod.id : 'gap' + si">
         <div v-if="!prod" class="hidden lg:block" />
         <button
